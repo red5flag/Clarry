@@ -1,0 +1,14 @@
+[package]
+name = "l8-loader"
+
+[leptos_options]
+site-addr    = "0.0.0.0:3000"
+site-root    = "target/site"
+site-pkg-dir = "pkg"
+reload-port  = 3001
+output-name  = "l8-loader"
+style-file   = ""
+assets-dir   = "public"
+env          = "DEV"
+bin-features = ["ssr"]
+lib-features = ["hydrate"]

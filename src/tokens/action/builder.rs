@@ -1,0 +1,270 @@
+// src/tokens/action/builder.rs
+//
+// Shorthand constructors for TokenAction variants and default registrations.
+
+use crate::tokens::node::Str;
+use crate::tokens::action::types::{TokenAction, LogLevel, DataTarget};
+#[cfg(target_arch = "wasm32")]
+use crate::tokens::action::registry::ActionRegistry;
+
+// ── Shorthand constructors ────────────────────────────────────────────────────
+
+pub fn log(msg: impl Into<Str>) -> TokenAction {
+    TokenAction::Log { level: LogLevel::Info, message: msg.into() }
+}
+
+pub fn debug(msg: impl Into<Str>) -> TokenAction {
+    TokenAction::Log { level: LogLevel::Debug, message: msg.into() }
+}
+
+pub fn warn(msg: impl Into<Str>) -> TokenAction {
+    TokenAction::Log { level: LogLevel::Warn, message: msg.into() }
+}
+
+pub fn chain(actions: Vec<TokenAction>) -> TokenAction {
+    TokenAction::Chain(actions)
+}
+
+pub fn show(id: impl Into<Str>) -> TokenAction {
+    TokenAction::Show { show: id.into(), hide: vec![] }
+}
+
+pub fn show_hiding(show_id: impl Into<Str>, hide_ids: Vec<impl Into<Str>>) -> TokenAction {
+    TokenAction::Show { 
+        show: show_id.into(), 
+        hide: hide_ids.into_iter().map(|s| s.into()).collect() 
+    }
+}
+
+pub fn hide(id: impl Into<Str>) -> TokenAction {
+    TokenAction::Hide(id.into())
+}
+
+pub fn hide_all_modals() -> TokenAction {
+    TokenAction::HideAllModals
+}
+
+pub fn toggle_class(target: impl Into<Str>, class: impl Into<Str>) -> TokenAction {
+    TokenAction::ToggleClass { target: target.into(), class: class.into() }
+}
+
+pub fn add_class(target: impl Into<Str>, class: impl Into<Str>) -> TokenAction {
+    TokenAction::SetStyle { 
+        target: target.into(), 
+        property: "class".into(), 
+        value: class.into() 
+    }
+}
+
+pub fn remove_class(target: impl Into<Str>, class: impl Into<Str>) -> TokenAction {
+    TokenAction::ToggleClass { target: target.into(), class: class.into() }
+}
+
+pub fn set_style(target: impl Into<Str>, property: impl Into<Str>, value: impl Into<Str>) -> TokenAction {
+    TokenAction::SetStyle { 
+        target: target.into(), 
+        property: property.into(), 
+        value: value.into() 
+    }
+}
+
+pub fn set_attr(target: impl Into<Str>, attr: impl Into<Str>, value: impl Into<Str>) -> TokenAction {
+    TokenAction::SetStyle { 
+        target: target.into(), 
+        property: attr.into(), 
+        value: value.into() 
+    }
+}
+
+pub fn navigate(page: impl Into<Str>) -> TokenAction {
+    TokenAction::Navigate(page.into())
+}
+
+pub fn open_url(url: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("open_url:{}", url.into()).into())
+}
+
+pub fn open_url_new_tab(url: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("open_url_new:{}", url.into()).into())
+}
+
+pub fn trigger_upload(accept: impl Into<Str>) -> TokenAction {
+    TokenAction::TriggerFileInput { 
+        accept: Some(accept.into()), 
+        multiple: false 
+    }
+}
+
+pub fn copy_to_clipboard(text: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("copy:{}", text.into()).into())
+}
+
+// ── Shorthand action functions for token DSL ─────────────────────────────────
+
+pub fn route(path: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("route:{}", path.into()).into())
+}
+
+pub fn form(name: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("form:{}", name.into()).into())
+}
+
+pub fn toggle(state: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("toggle:{}", state.into()).into())
+}
+
+pub fn drag(name: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("drag:{}", name.into()).into())
+}
+
+pub fn val(name: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("val:{}", name.into()).into())
+}
+
+pub fn search(query: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("search:{}", query.into()).into())
+}
+
+pub fn scroll(handler: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("scroll:{}", handler.into()).into())
+}
+
+pub fn key(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("key:{}", key.into()).into())
+}
+
+pub fn resize(handler: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("resize:{}", handler.into()).into())
+}
+
+pub fn intersect(handler: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("intersect:{}", handler.into()).into())
+}
+
+pub fn in_(name: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("in:{}", name.into()).into())
+}
+
+// ── Storage actions ────────────────────────────────────────────────────────────
+
+pub fn store_set(key: impl Into<Str>, val: impl Into<Str>) -> TokenAction {
+    TokenAction::StoreSet { 
+        key: key.into(), 
+        value: val.into(), 
+    }
+}
+
+pub fn store_get(key: impl Into<Str>, target: impl Into<Str>) -> TokenAction {
+    TokenAction::StoreGet { 
+        key: key.into(), 
+        target: DataTarget::Element(target.into()), 
+    }
+}
+
+pub fn store_delete(key: impl Into<Str>) -> TokenAction {
+    TokenAction::StoreDelete { 
+        key: key.into(), 
+    }
+}
+
+// ── State actions ──────────────────────────────────────────────────────────────
+
+pub fn toggle_state(key: impl Into<Str>) -> TokenAction {
+    TokenAction::ToggleState {
+        key: key.into(),
+        on_state: "true".into(),
+        off_state: "false".into(),
+    }
+}
+
+pub fn cycle_state(key: impl Into<Str>, values: Vec<impl Into<Str>>) -> TokenAction {
+    let key = key.into();
+    let values_str = values.into_iter().map(|v| v.into().to_string()).collect::<Vec<_>>().join(",");
+    TokenAction::Custom(format!("cycle:{}:{}", key, values_str).into())
+}
+
+/// Increment a counter by 1 (default)
+pub fn increment(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Increment { key: key.into(), by: 1 }
+}
+
+/// Increment a counter by a specific amount
+pub fn increment_by(key: impl Into<Str>, amount: i32) -> TokenAction {
+    TokenAction::Increment { key: key.into(), by: amount }
+}
+
+/// Decrement a counter by 1 (default)
+pub fn decrement(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Decrement { key: key.into(), by: 1 }
+}
+
+/// Decrement a counter by a specific amount
+pub fn decrement_by(key: impl Into<Str>, amount: i32) -> TokenAction {
+    TokenAction::Decrement { key: key.into(), by: amount }
+}
+
+// ── Form actions ───────────────────────────────────────────────────────────────
+
+pub fn submit_form(form_id: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("submit:{}", form_id.into()).into())
+}
+
+pub fn fetch_get(endpoint: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("fetch:get:{}", endpoint.into()).into())
+}
+
+/// Preload data from an endpoint and store it under a key
+pub fn preload(key: impl Into<Str>, endpoint: impl Into<Str>) -> TokenAction {
+    TokenAction::Preload { key: key.into(), endpoint: endpoint.into() }
+}
+
+/// Watch a storage key for changes and trigger reactive updates
+pub fn store_watch(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Watch { key: key.into() }
+}
+
+/// Store a value with a TTL (time-to-live in seconds)
+pub fn store_set_ttl(key: impl Into<Str>, val: impl Into<Str>, ttl_seconds: u64) -> TokenAction {
+    TokenAction::StoreSetTtl {
+        key: key.into(),
+        value: val.into(),
+        ttl_seconds,
+    }
+}
+
+pub fn store_from_val(storage_key: impl Into<Str>, val_key: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("store_from_val:{}:{}", storage_key.into(), val_key.into()).into())
+}
+
+pub fn set_theme_var(name: impl Into<Str>, value: impl Into<Str>) -> TokenAction {
+    TokenAction::SetThemeVar { name: name.into(), value: value.into() }
+}
+
+/// Apply debounce to an action via EventBinding (use .debounce_ms() on the binding instead)
+pub fn debounce(_action: TokenAction, _ms: u32) -> TokenAction {
+    TokenAction::Custom("debounce:stub".into())
+}
+
+/// Apply throttle to an action via EventBinding (use .throttle_ms() on the binding instead)
+pub fn throttle(_action: TokenAction, _ms: u32) -> TokenAction {
+    TokenAction::Custom("throttle:stub".into())
+}
+
+// ── Navigation defaults ───────────────────────────────────────────────────────
+
+#[cfg(target_arch = "wasm32")]
+pub fn register_navigation_defaults() {
+    let r = ActionRegistry::global();
+    r.register("navigate_home", || {
+        if let Some(window) = web_sys::window() {
+            let _ = window.location().set_href("/");
+        }
+    });
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn register_navigation_defaults() {
+    // No-op on SSR
+}
+
+// ── Execute token action ─────────────────────────────────────────────────────

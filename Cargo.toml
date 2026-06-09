@@ -1,0 +1,136 @@
+[package]
+name = "l8-loader"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[workspace]
+members = ["."]
+
+[dependencies]
+leptos = { version = "0.8" }
+leptos_meta = { version = "0.8" }
+leptos_router = { version = "0.8" }
+leptos_axum = { version = "0.8", optional = true }
+axum = { version = "0.8", features = ["multipart"], optional = true }
+tokio = { version = "1", features = ["full"], optional = true }
+tower-http = { version = "0.6", features = ["fs"], optional = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version ="1.0", features = ["derive"] }
+serde_json = "1.0"
+log = "0.4"
+urlencoding = "2"
+rayon = "1.10"
+url = "2.5"
+anyhow = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+regex = "1.10"
+instant = { version = "0.1", features = ["wasm-bindgen"] }
+turboquant = { version = "0.1", optional = true }
+# ── uuid ──────────────────────────────────────────────────────────────────────
+# uuid 1.7+ removed the "js" feature and now uses rng-getrandom for WASM.
+# The getrandom backend is configured via .cargo/config.toml.
+uuid = { version = "1.10", features = ["v4", "rng-getrandom"] }
+
+dashmap = "5.5"
+bumpalo = { version = "3.14", features = ["collections"] }
+once_cell = "1.19"
+parking_lot = "0.12"
+
+# ── rand ──────────────────────────────────────────────────────────────────────
+# rand 0.10 pulls in getrandom 0.3.  The wasm_js backend is declared via
+# .cargo/config.toml so no additional feature flag is needed here.
+rand = "0.10"
+fastrand = "2.4.1"
+
+console_error_panic_hook = "0.1"
+wasm-bindgen = "0.2"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+web-sys = { version = "0.3", features = [
+    "File", "FileList", "HtmlInputElement", "HtmlTextAreaElement",
+    "Event", "MouseEvent", "EventTarget", "Window", "HtmlElement",
+    "Document", "NodeList", "Node", "Element", "Navigator",
+    "Storage", "Clipboard", "Performance", "Location", "History",
+    "BroadcastChannel", "Notification",
+] }
+
+# ── getrandom on WASM — THREE versions coexist in the dependency graph ────────
+#
+# getrandom 0.2 is pulled by gloo-utils, wasm-bindgen-futures, and most Leptos
+# ecosystem crates. It uses the Cargo "js" feature to enable its WASM backend.
+#
+# getrandom 0.3 is pulled by rand 0.10 and uuid 1.10. It switched to a rustc
+# --cfg flag instead of a Cargo feature. The .cargo/config.toml file sets
+# --cfg getrandom_backend="wasm_js" for the wasm32 target, and the "wasm_js"
+# Cargo feature here marks the crate as explicitly depending on that backend.
+#
+# getrandom 0.4 is pulled by leptos 0.8.19. It also uses the rustc --cfg flag
+# mechanism like 0.3, requiring the same "wasm_js" feature and config.toml setup.
+#
+# Using package aliases lets Cargo merge features into the correct version of
+# each crate without treating them as the same dependency.
+getrandom_v02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom_v03 = { package = "getrandom", version = "0.3", features = ["wasm_js"] }
+getrandom_v04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
+
+[build-dependencies]
+regex = "1.10"
+
+[features]
+default = ["ssr"]
+ssr = [
+    "leptos/ssr",
+    "leptos_meta/ssr",
+    "leptos_router/ssr",
+    "leptos_axum",
+    "axum",
+    "tokio",
+    "tower-http",
+]
+hydrate = [
+    "leptos/hydrate",
+    "leptos/csr",
+]
+turboquant = ["dep:turboquant"]
+
+[package.metadata.leptos]
+name = "l8-loader"
+output-name = "l8-loader"
+lib-name = "l8-loader"
+bin-name = "l8-loader"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "0.0.0.0:3000"
+reload-port = 3001
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+# Post-build command to copy WASM file with _bg suffix for wasm-bindgen compatibility
+post-build = "cp target/site/pkg/l8-loader.wasm target/site/pkg/l8-loader_bg.wasm"
+
+[workspace.metadata.leptos]
+name = "l8-loader"
+lib-name = "l8-loader"
+bin-name = "l8-loader"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+site-addr = "0.0.0.0:3000"
+reload-port = 3001
+env = "DEV"
+bin-features = ["ssr"]
+lib-features = ["hydrate"]
+# Post-build command to copy WASM file with _bg suffix for wasm-bindgen compatibility
+post-build = "cp target/site/pkg/l8-loader.wasm target/site/pkg/l8-loader_bg.wasm"
+
+[profile.wasm-release]
+inherits = "release"
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = "abort"
