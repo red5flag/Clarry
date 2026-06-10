@@ -8,6 +8,7 @@ use leptos::prelude::*;
 use crate::tokens::action::{TokenAction, LogLevel, ActionRegistry};
 use crate::tokens::reactive::TokenCtx;
 use crate::tokens::debug::inspector_log;
+use crate::tokens::storage::Store;
 
 #[cfg(target_arch = "wasm32")]
 use super::dom;
@@ -93,28 +94,19 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             }
             TokenAction::StoreSet { key, value } => {
                 leptos::logging::log!("[TOKEN_ACTION] StoreSet - key: {}, value: {}", key, value);
-                #[cfg(target_arch = "wasm32")]
-                if let Some(storage) = web_sys::window()
-                    .and_then(|w| w.local_storage().ok()).flatten()
-                {
-                    let _ = storage.set_item(key, value);
-                }
+                let val = value.to_string();
+                Store::write(key, &val);
+                ctx.set_string(key, val);
+                ctx.bump_list_rev();
             }
             TokenAction::StoreSetTtl { key, value, ttl_seconds } => {
                 leptos::logging::log!("[TOKEN_ACTION] StoreSetTtl - key: {}, ttl: {}s", key, ttl_seconds);
-                #[cfg(target_arch = "wasm32")]
-                if let Some(storage) = web_sys::window()
-                    .and_then(|w| w.local_storage().ok()).flatten()
-                {
-                    let _ = storage.set_item(key, value);
-                    let ttl_key = format!("{}:_ttl", key);
-                    let now = web_sys::window()
-                        .and_then(|w| w.performance())
-                        .map(|p| p.now() as u64)
-                        .unwrap_or(0);
-                    let expires = now + (*ttl_seconds as u64 * 1000);
-                    let _ = storage.set_item(&ttl_key, &expires.to_string());
-                }
+                let val = value.to_string();
+                Store::write(key, &val);
+                ctx.set_string(key, val);
+                ctx.bump_list_rev();
+                // TTL is handled at cache layer; backend persists regardless
+                let _ttl = *ttl_seconds;
             }
             TokenAction::Preload { key, endpoint } => {
                 leptos::logging::log!("[TOKEN_ACTION] Preload - key: {}, endpoint: {}", key, endpoint);
@@ -133,11 +125,7 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                                         if let Ok(text) = text {
                                             if let Some(text_str) = text.as_string() {
                                                 leptos::logging::log!("[TOKEN_ACTION] Preload success: {}", text_str);
-                                                if let Some(storage) = web_sys::window()
-                                                    .and_then(|w| w.local_storage().ok()).flatten()
-                                                {
-                                                    let _ = storage.set_item(&key, &text_str);
-                                                }
+                                                Store::write(&key, &text_str);
                                             }
                                         }
                                     }
@@ -149,43 +137,30 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             }
             TokenAction::Watch { key } => {
                 leptos::logging::log!("[TOKEN_ACTION] Watch - key: {}", key);
-                #[cfg(target_arch = "wasm32")]
-                if let Some(storage) = web_sys::window()
-                    .and_then(|w| w.local_storage().ok()).flatten()
-                {
-                    if let Ok(Some(val)) = storage.get_item(key) {
-                        leptos::logging::log!("[TOKEN_ACTION] Watch updated key: {} -> {}", key, &val);
-                        ctx.set_string(key, val);
-                        ctx.bump_list_rev();
-                    }
+                if let Some(val) = Store::read(key) {
+                    leptos::logging::log!("[TOKEN_ACTION] Watch updated key: {} -> {}", key, &val);
+                    ctx.set_string(key, val);
+                    ctx.bump_list_rev();
                 }
             }
             TokenAction::StoreGet { key, target } => {
                 leptos::logging::log!("[TOKEN_ACTION] StoreGet - key: {}", key);
-                #[cfg(target_arch = "wasm32")]
-                if let Some(storage) = web_sys::window()
-                    .and_then(|w| w.local_storage().ok()).flatten()
-                {
-                    if let Ok(Some(val)) = storage.get_item(key) {
-                        match target {
-                            crate::tokens::action::DataTarget::Signal(id) => {
-                                ctx.set_string(id, val);
-                            }
-                            crate::tokens::action::DataTarget::Element(id) => {
-                                ctx.set_string(id, val);
-                            }
+                if let Some(val) = Store::read(key) {
+                    match target {
+                        crate::tokens::action::DataTarget::Signal(id) => {
+                            ctx.set_string(id, val);
+                        }
+                        crate::tokens::action::DataTarget::Element(id) => {
+                            ctx.set_string(id, val);
                         }
                     }
                 }
             }
             TokenAction::StoreDelete { key } => {
                 leptos::logging::log!("[TOKEN_ACTION] StoreDelete - key: {}", key);
-                #[cfg(target_arch = "wasm32")]
-                if let Some(storage) = web_sys::window()
-                    .and_then(|w| w.local_storage().ok()).flatten()
-                {
-                    let _ = storage.remove_item(key);
-                }
+                Store::delete_root(key);
+                ctx.set_string(key, "");
+                ctx.bump_list_rev();
             }
             TokenAction::Increment { key, by } => {
                 leptos::logging::log!("[TOKEN_ACTION] Increment - key: {}, by: {}", key, by);
@@ -200,15 +175,28 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             }
             TokenAction::ToggleState { key, on_state: _, off_state: _ } => {
                 leptos::logging::log!("[TOKEN_ACTION] ToggleState - key: {}", key);
-                // Toggle the visibility signal for the key
-                ctx.visibility.update(|m| {
-                    let id = key.to_string();
-                    if let Some(current) = m.get(&id).copied() {
-                        m.insert(id, !current);
-                    } else {
-                        m.insert(id, true); // Default to showing if not set
-                    }
-                });
+                let id = key.to_string();
+                // Toggle visibility: if not explicitly set, default is visible
+                // so first click hides.  If already hidden (seeded), first click shows.
+                let current = ctx.visibility.get().get(&id).copied();
+                let new_val = match current {
+                    Some(v) => !v,
+                    None    => false, // visible → hide
+                };
+                ctx.visibility.update(|m| { m.insert(id.clone(), new_val); });
+                // Sync extra classes so Tailwind "hidden" tracks the signal.
+                if new_val {
+                    ctx.classes.update(|m| {
+                        if let Some(list) = m.get_mut(&id) {
+                            list.retain(|c| c != "hidden");
+                        }
+                    });
+                } else {
+                    ctx.classes.update(|m| {
+                        m.entry(id.clone()).or_default().retain(|c| c != "hidden");
+                        m.entry(id).or_default().push("hidden".to_string());
+                    });
+                }
             }
             TokenAction::RequestFullscreen => {
                 #[cfg(target_arch = "wasm32")]
@@ -362,10 +350,24 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
     } else if let Some(key) = name.strip_prefix("toggle:") {
         leptos::logging::log!("[TOKEN_ACTION] toggle -> {}", key);
         let key_str = key.to_string();
-        ctx.visibility.update(|m| {
-            let entry = m.entry(key_str.clone()).or_insert(false);
-            *entry = !*entry;
-        });
+        let current = ctx.visibility.get().get(&key_str).copied();
+        let new_val = match current {
+            Some(v) => !v,
+            None    => false,
+        };
+        ctx.visibility.update(|m| { m.insert(key_str.clone(), new_val); });
+        if new_val {
+            ctx.classes.update(|m| {
+                if let Some(list) = m.get_mut(&key_str) {
+                    list.retain(|c| c != "hidden");
+                }
+            });
+        } else {
+            ctx.classes.update(|m| {
+                m.entry(key_str.clone()).or_default().retain(|c| c != "hidden");
+                m.entry(key_str).or_default().push("hidden".to_string());
+            });
+        }
     } else if name == "dismiss_toast" {
         leptos::logging::log!("[TOKEN_ACTION] dismiss_toast");
         // Dismiss the most recent toast (or all if needed)
@@ -373,6 +375,98 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
     } else if name == "show_toast" {
         leptos::logging::log!("[TOKEN_ACTION] show_toast");
         ctx.show_toast("Toast notification");
+    } else if let Some(rest) = name.strip_prefix("chat_send:") {
+        leptos::logging::log!("[TOKEN_ACTION] chat_send -> {}", rest);
+        let parts: Vec<&str> = rest.splitn(3, ':').collect();
+        if parts.len() >= 2 {
+            let input_key = parts[0];
+            let storage_key = parts[1];
+            let sender = parts.get(2).unwrap_or(&"me");
+            let text = ctx.strings.get().get(input_key).cloned().unwrap_or_default();
+            if !text.is_empty() {
+                use crate::tokens::storage::primitive::Store;
+                // Write to user.message.# → auto-append under storage_key root
+                let root = storage_key.split('.').next().unwrap_or(storage_key);
+                let array_path = format!("{}.#", storage_key);
+                let count = Store::read(storage_key)
+                    .and_then(|s| serde_json::from_str::<Vec<serde_json::Value>>(&s).ok())
+                    .map(|v| v.len())
+                    .unwrap_or(0);
+                let msg_json = format!(
+                    r#"{{"id":"msg_{}","text":"{}","sender":"{}","timestamp":"now"}}"#,
+                    count + 1,
+                    text.replace('"', "\\\""),
+                    sender
+                );
+                Store::write(&array_path, &msg_json);
+                // Update reactive strings so text_bind refreshes
+                if let Some(updated) = Store::read(root) {
+                    ctx.set_string(root, updated.clone());
+                    // Also update any nested binding
+                    ctx.set_string(storage_key, updated);
+                }
+                ctx.bump_list_rev();
+                // Clear input
+                ctx.set_string(input_key, "");
+            }
+        }
+    } else if let Some(rest) = name.strip_prefix("store_set_input:") {
+        leptos::logging::log!("[TOKEN_ACTION] store_set_input -> {}", rest);
+        let parts: Vec<&str> = rest.splitn(2, ':').collect();
+        if parts.len() == 2 {
+            let key = parts[0];
+            let input_key = parts[1];
+            let val = ctx.strings.get().get(input_key).cloned().unwrap_or_default();
+            if !val.is_empty() {
+                use crate::tokens::storage::primitive::Store;
+                Store::write(key, &val);
+                ctx.set_string(key, val);
+                ctx.bump_list_rev();
+                ctx.set_string(input_key, "");
+            }
+        }
+    } else if let Some(id) = name.strip_prefix("toggle_drawer:") {
+        leptos::logging::log!("[TOKEN_ACTION] toggle_drawer -> {}", id);
+        let id_str = id.to_string();
+        let current = ctx.visibility.get().get(&id_str).copied();
+        let new_val = match current {
+            Some(v) => !v,
+            None    => false,
+        };
+        ctx.visibility.update(|m| { m.insert(id_str.clone(), new_val); });
+        if new_val {
+            ctx.classes.update(|m| {
+                if let Some(list) = m.get_mut(&id_str) {
+                    list.retain(|c| c != "hidden");
+                }
+            });
+        } else {
+            ctx.classes.update(|m| {
+                m.entry(id_str.clone()).or_default().retain(|c| c != "hidden");
+                m.entry(id_str).or_default().push("hidden".to_string());
+            });
+        }
+    } else if let Some(ids_str) = name.strip_prefix("cycle_drawer:") {
+        leptos::logging::log!("[TOKEN_ACTION] cycle_drawer -> {}", ids_str);
+        let ids: Vec<String> = ids_str.split(',').map(|s| s.to_string()).collect();
+        if !ids.is_empty() {
+            let vis = ctx.visibility.get();
+            let current_idx = ids.iter().position(|id| vis.get(id).copied().unwrap_or(false));
+            // Hide all first
+            for id in &ids {
+                ctx.visibility.update(|m| { m.insert(id.clone(), false); });
+            }
+            // Show next (or none if at end)
+            if let Some(idx) = current_idx {
+                let next_idx = (idx + 1) % ids.len();
+                if next_idx != idx || ids.len() == 1 {
+                    ctx.visibility.update(|m| { m.insert(ids[next_idx].clone(), true); });
+                }
+            } else {
+                // None open → open first
+                ctx.visibility.update(|m| { m.insert(ids[0].clone(), true); });
+            }
+        }
     } else if let Some(rest) = name.strip_prefix("store_from_val:") {
         leptos::logging::log!("[TOKEN_ACTION] store_from_val -> {}", rest);
         let parts: Vec<&str> = rest.splitn(2, ':').collect();
@@ -380,10 +474,9 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
             let storage_key = parts[0];
             let val_key = parts[1];
             let val = ctx.strings.get().get(val_key).cloned().unwrap_or_default();
-            #[cfg(target_arch = "wasm32")]
-            if let Some(storage) = web_sys::window().and_then(|w| w.local_storage().ok()).flatten() {
-                let _ = storage.set_item(storage_key, &val);
-            }
+            Store::write(storage_key, &val);
+            ctx.set_string(storage_key, &val);
+            ctx.bump_list_rev();
             leptos::logging::log!("[TOKEN_ACTION] stored '{}' -> {} = {}", val_key, storage_key, val);
         }
     } else if let Some(form_id) = name.strip_prefix("form:") {

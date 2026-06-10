@@ -7,9 +7,13 @@ pub mod backends;
 pub mod manager;
 pub mod list;
 pub mod file;
+pub mod nested;
+pub mod primitive;
 
 pub use entry::*;
 pub use backends::*;
 pub use manager::*;
 pub use list::*;
 pub use file::*;
+pub use nested::*;
+pub use primitive::*;

@@ -311,6 +311,16 @@ fn preprocess_token_dsl(content: &str) -> String {
             }
         }
 
+        // Unknown standalone function call at deeper indent → wrap in .child()
+        if is_standalone && !container_stack.is_empty() {
+            let parent_indent = *container_stack.last().unwrap();
+            if indent > parent_indent {
+                let transformed = " ".repeat(indent) + ".child(" + stripped + ")";
+                result.push(transformed);
+                continue;
+            }
+        }
+
         if is_standalone_container(stripped) {
             container_stack.push(indent);
             result.push(line.to_string());
@@ -2074,6 +2084,7 @@ FILE: src/pages/demo.rs
 ================================================================================
 
 
+
 pub fn page_token() -> impl IntoToken {
     col()
         .id("demo_page")
@@ -2459,7 +2470,6 @@ fn card(title: &str) -> Block {
 
 
 
-
 ================================================================================
 FILE: src/pages/feed.rs
 ================================================================================
@@ -2525,49 +2535,49 @@ pub fn page_token() -> impl IntoToken {
         .id("instagram_create_page")
         .css("min-h-screen bg-black text-white pb-20")
         // Header
-        .child(row()
+        row()
             .css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
-            .child(btn("← Back").variant("ghost").size_str("sm").act(navigate("instagram")))
-            .child(text("New Post").css("text-lg font-bold"))
-            .child(block().css("w-12"))
-        )
-        .child(col().css("px-4 py-6 gap-6")
+            btn("← Back").variant("ghost").size_str("sm").on_click_nav("instagram")
+            text("New Post").css("text-lg font-bold")
+            block().css("w-12")
+        .end()
+        col().css("px-4 py-6 gap-6")
             // Media upload placeholder
-            .child(block().css("aspect-square bg-gray-900 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center")
-                .child(col().css("items-center gap-2")
-                    .child(text("📷").css("text-4xl"))
-                    .child(text("Tap to upload photo").css("text-sm text-gray-400"))
-                )
-            )
+            block().css("aspect-square bg-gray-900 border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center")
+                col().css("items-center gap-2")
+                    text("📷").css("text-4xl")
+                    text("Tap to upload photo").css("text-sm text-gray-400")
+                .end()
+            .end()
             // Caption
-            .child(col().css("gap-1")
-                .child(text("Caption").css("text-sm text-gray-400"))
-                .child(block().css("bg-gray-900 border border-gray-700 rounded-lg p-3 min-h-[80px]")
-                    .act(in_("ig_caption_input")))
-            )
+            col().css("gap-1")
+                text("Caption").css("text-sm text-gray-400")
+                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3 min-h-[80px]")
+                    .act(in_("ig_caption_input"))
+            .end()
             // Story toggle
-            .child(row().css("items-center justify-between py-2")
-                .child(text("Share to Story").css("text-sm"))
-                .child(block().css("w-12 h-6 bg-gray-700 rounded-full relative")
-                    .child(block().css("absolute left-1 top-1 w-4 h-4 bg-white rounded-full")))
-            )
+            row().css("items-center justify-between py-2")
+                text("Share to Story").css("text-sm")
+                block().css("w-12 h-6 bg-gray-700 rounded-full relative")
+                    block().css("absolute left-1 top-1 w-4 h-4 bg-white rounded-full")
+                .end()
+            .end()
             // Post button
-            .child(btn("Share").variant("primary").size_str("md").css("w-full rounded-lg")
+            btn("Share").variant("primary").size_str("md").css("w-full rounded-lg")
                 .act(chain(vec![
                     store_from_val("ig_last_caption", "ig_caption_input"),
                     navigate("instagram"),
                 ]))
-            )
-        )
+        .end()
         // Bottom nav
-        .child(row()
+        row()
             .css("fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 py-3 px-6 justify-between z-50")
-            .child(btn("🏠").variant("ghost").act(navigate("instagram")).css("text-xl"))
-            .child(btn("🔍").variant("ghost").css("text-xl"))
-            .child(btn("➕").variant("ghost").act(navigate("instagram_create")).css("text-xl text-blue-400"))
-            .child(btn("♡").variant("ghost").css("text-xl"))
-            .child(img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full"))
-        )
+            btn("🏠").variant("ghost").on_click_nav("instagram").css("text-xl")
+            btn("🔍").variant("ghost").css("text-xl")
+            btn("➕").variant("ghost").on_click_nav("instagram_create").css("text-xl text-blue-400")
+            btn("♡").variant("ghost").css("text-xl")
+            img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full")
+        .end()
 }
 
 
@@ -2582,56 +2592,55 @@ pub fn page_token() -> impl IntoToken {
         .id("instagram_edit_page")
         .css("min-h-screen bg-black text-white pb-20")
         // Header
-        .child(row()
+        row()
             .css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
-            .child(btn("← Back").variant("ghost").size_str("sm").act(navigate("instagram")))
-            .child(text("Edit Profile").css("text-lg font-bold"))
-            .child(block().css("w-12"))
-        )
-        .child(col().css("px-4 py-6 gap-6")
+            btn("← Back").variant("ghost").size_str("sm").on_click_nav("instagram")
+            text("Edit Profile").css("text-lg font-bold")
+            block().css("w-12")
+        .end()
+        col().css("px-4 py-6 gap-6")
             // Avatar preview
-            .child(col().css("items-center gap-2")
-                .child(img_block(user.avatar_url.as_str())
-                    .css("w-24 h-24 rounded-full border-2 border-white"))
-                .child(btn("Change Photo").variant("ghost").size_str("sm").css("text-blue-400"))
-            )
+            col().css("items-center gap-2")
+                img_block(user.avatar_url.as_str())
+                    .css("w-24 h-24 rounded-full border-2 border-white")
+                btn("Change Photo").variant("ghost").size_str("sm").css("text-blue-400")
+            .end()
             // Name
-            .child(col().css("gap-1")
-                .child(text("Name").css("text-sm text-gray-400"))
-                .child(block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
-                    .act(in_("ig_name_input")))
-            )
+            col().css("gap-1")
+                text("Name").css("text-sm text-gray-400")
+                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
+                    .act(in_("ig_name_input"))
+            .end()
             // Username
-            .child(col().css("gap-1")
-                .child(text("Username").css("text-sm text-gray-400"))
-                .child(block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
-                    .act(in_("ig_handle_input")))
-            )
+            col().css("gap-1")
+                text("Username").css("text-sm text-gray-400")
+                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
+                    .act(in_("ig_handle_input"))
+            .end()
             // Bio
-            .child(col().css("gap-1")
-                .child(text("Bio").css("text-sm text-gray-400"))
-                .child(block().css("bg-gray-900 border border-gray-700 rounded-lg p-3 min-h-[80px]")
-                    .act(in_("ig_bio_input")))
-            )
+            col().css("gap-1")
+                text("Bio").css("text-sm text-gray-400")
+                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3 min-h-[80px]")
+                    .act(in_("ig_bio_input"))
+            .end()
             // Save button
-            .child(btn("Save").variant("primary").size_str("md").css("w-full rounded-lg")
+            btn("Save").variant("primary").size_str("md").css("w-full rounded-lg")
                 .act(chain(vec![
                     store_from_val("ig_name", "ig_name_input"),
                     store_from_val("ig_handle", "ig_handle_input"),
                     store_from_val("ig_bio", "ig_bio_input"),
                     navigate("instagram"),
                 ]))
-            )
-        )
+        .end()
         // Bottom nav
-        .child(row()
+        row()
             .css("fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 py-3 px-6 justify-between z-50")
-            .child(btn("🏠").variant("ghost").act(navigate("instagram")).css("text-xl"))
-            .child(btn("🔍").variant("ghost").css("text-xl"))
-            .child(btn("➕").variant("ghost").act(navigate("instagram_create")).css("text-xl"))
-            .child(btn("♡").variant("ghost").css("text-xl"))
-            .child(img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full"))
-        )
+            btn("🏠").variant("ghost").on_click_nav("instagram").css("text-xl")
+            btn("🔍").variant("ghost").css("text-xl")
+            btn("➕").variant("ghost").on_click_nav("instagram_create").css("text-xl")
+            btn("♡").variant("ghost").css("text-xl")
+            img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full")
+        .end()
 }
 
 
@@ -2647,72 +2656,71 @@ pub fn page_token() -> impl IntoToken {
         .id("instagram_page")
         .css("min-h-screen bg-black text-white pb-20")
         // Header
-        .child(row()
+        row()
             .css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
-            .child(text("Instagram").css("text-xl font-bold tracking-tight"))
-            .child(row().css("gap-4")
-                .child(text("♡").css("text-xl"))
-                .child(text("✉").css("text-xl"))
-            )
-        )
+            text("Instagram").css("text-xl font-bold tracking-tight")
+            row().css("gap-4")
+                text("♡").css("text-xl")
+                text("✉").css("text-xl")
+            .end()
+        .end()
         // Profile header
-        .child(row()
+        row()
             .css("px-4 py-6 gap-4 sm:gap-6 items-center")
-            .child(img_block(user.avatar_url.as_str())
+            img_block(user.avatar_url.as_str())
                 .css("w-16 h-16 sm:w-20 sm:h-20 rounded-full border-2 border-white flex-shrink-0")
-            )
-            .child(col().css("flex-1 min-w-0")
-                .child(text_bind("ig_name").css("text-lg font-bold truncate"))
-                .child(text_bind("ig_handle").css("text-sm text-gray-400 truncate"))
-                .child(row().css("gap-2 sm:gap-4 mt-1")
-                    .child(text(format!("{} posts", user.posts_count)).css("text-xs sm:text-sm"))
-                    .child(text(format!("{} followers", user.followers)).css("text-xs sm:text-sm"))
-                    .child(text(format!("{} following", user.following)).css("text-xs sm:text-sm"))
-                )
-            )
-        )
-        .child(text_bind("ig_bio").css("px-4 text-sm text-gray-300"))
+            col().css("flex-1 min-w-0")
+                text_bind("ig_name").css("text-lg font-bold truncate")
+                text_bind("ig_handle").css("text-sm text-gray-400 truncate")
+                row().css("gap-2 sm:gap-4 mt-1")
+                    text(format!("{} posts", user.posts_count)).css("text-xs sm:text-sm")
+                    text(format!("{} followers", user.followers)).css("text-xs sm:text-sm")
+                    text(format!("{} following", user.following)).css("text-xs sm:text-sm")
+                .end()
+            .end()
+        .end()
+        text_bind("ig_bio").css("px-4 text-sm text-gray-300")
         // Action buttons
-        .child(row().css("px-4 py-3 gap-2")
-            .child(btn("Edit Profile").variant("ghost").size_str("sm").css("flex-1 border border-gray-700 rounded-lg")
-                .act(navigate("instagram_edit")))
-            .child(btn("Create").variant("ghost").size_str("sm").css("flex-1 border border-gray-700 rounded-lg")
-                .act(navigate("instagram_create")))
-        )
+        row().css("px-4 py-3 gap-2")
+            btn("Edit Profile").variant("ghost").size_str("sm").css("flex-1 border border-gray-700 rounded-lg")
+                .on_click_nav("instagram_edit")
+            btn("Create").variant("ghost").size_str("sm").css("flex-1 border border-gray-700 rounded-lg")
+                .on_click_nav("instagram_create")
+        .end()
         // Stories
-        .child(row()
+        row()
             .css("px-4 py-4 gap-4 overflow-x-auto scrollbar-none")
-            .child(story_ring("Your Story", "https://i.pravatar.cc/150?u=me"))
-            .child(story_ring("Alice", "https://i.pravatar.cc/150?u=alice"))
-            .child(story_ring("Bob", "https://i.pravatar.cc/150?u=bob"))
-        )
-        // Posts grid
-        .child(grid(3).css("gap-1 px-0")
+            story_ring("Your Story", "https://i.pravatar.cc/150?u=me")
+            story_ring("Alice", "https://i.pravatar.cc/150?u=alice")
+            story_ring("Bob", "https://i.pravatar.cc/150?u=bob")
+        .end()
+        // Posts grid - fixed: added grid-cols-3 and rounded corners
+        grid(3).css("grid-cols-3 gap-1 px-0")
             .children(posts.iter().map(|p| {
                 block()
-                    .css("aspect-square bg-gray-800 relative overflow-hidden")
+                    .css("aspect-square bg-gray-800 relative overflow-hidden rounded-sm")
                     .child(img_block(p.image_url.as_deref().unwrap_or(""))
                         .css("w-full h-full object-cover")
                     )
             }))
-        )
+        .end()
         // Bottom nav
-        .child(row()
+        row()
             .css("fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 py-3 px-6 justify-between z-50")
-            .child(btn("🏠").variant("ghost").act(navigate("instagram")).css("text-xl"))
-            .child(btn("🔍").variant("ghost").css("text-xl"))
-            .child(btn("➕").variant("ghost").act(navigate("instagram_create")).css("text-xl"))
-            .child(btn("♡").variant("ghost").css("text-xl"))
-            .child(img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full"))
-        )
+            btn("🏠").variant("ghost").on_click_nav("instagram").css("text-xl")
+            btn("🔍").variant("ghost").css("text-xl")
+            btn("➕").variant("ghost").on_click_nav("instagram_create").css("text-xl")
+            btn("♡").variant("ghost").css("text-xl")
+            img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full")
+        .end()
 }
 
 fn story_ring(_name: &str, img: &str) -> impl IntoToken {
     col().css("items-center gap-1 min-w-[72px]")
-        .child(img_block(img)
+        img_block(img)
             .css("w-14 h-14 sm:w-16 sm:h-16 rounded-full border-2 border-pink-500 p-0.5")
-        )
-        .child(text(_name).css("text-xs text-gray-300"))
+        text(_name).css("text-xs text-gray-300")
+    .end()
 }
 
 
@@ -4404,6 +4412,245 @@ pub fn select(id: impl Into<Str>, options: Vec<impl Into<Str>>) -> Container {
 
 
 ================================================================================
+FILE: src/tokens/builders/page_config.rs
+================================================================================
+
+// src/tokens/builders/page_config.rs
+//
+// Global page configuration: Palette, Media, and Store presets.
+// Use `page_config()` to set up global styles, responsive breakpoints,
+// and default storage values before your main layout.
+//
+// Example:
+//   page_config()
+//       .palette(Palette::dark())
+//       .media(Media::mobile_first())
+//       .store_preset("user", json!({"name":"Guest"}))
+//       .page("demo")
+//           col()
+//               text("Hello")
+
+use crate::tokens::node::{IntoToken, Str, TokenNode};
+use crate::tokens::core::id::next_id;
+use super::spec::TokenBuilder;
+use super::types::Container;
+
+// ── PageConfig builder ─────────────────────────────────────────────────────────
+
+#[derive(Clone)]
+pub struct PageConfig {
+    pub root: Container,
+    pub palette: Palette,
+    pub media: Media,
+    pub store_presets: Vec<(Str, Str)>,
+}
+
+impl PageConfig {
+    pub fn new() -> Self {
+        Self {
+            root: Container { stack: vec![TokenNode::new(next_id())] },
+            palette: Palette::default(),
+            media: Media::default(),
+            store_presets: Vec::new(),
+        }
+    }
+
+    /// Apply a palette to the page.
+    pub fn palette(mut self, p: Palette) -> Self {
+        self.palette = p;
+        self
+    }
+
+    /// Apply media/responsive configuration.
+    pub fn media(mut self, m: Media) -> Self {
+        self.media = m;
+        self
+    }
+
+    /// Add a store preset. `key` is the storage key, `json` is the default value.
+    pub fn store_preset(mut self, key: impl Into<Str>, value: impl Into<Str>) -> Self {
+        self.store_presets.push((key.into(), value.into()));
+        self
+    }
+
+    /// Set the page id on the root container.
+    pub fn page_id(mut self, id: impl Into<Str>) -> Self {
+        self.root = self.root.id(id);
+        self
+    }
+
+    /// Attach the main page layout as a child of the config root.
+    pub fn page(mut self, content: impl IntoToken) -> Container {
+        let mut root = self.root;
+        // Inject palette CSS variables as a style block child
+        let palette_css = self.palette.to_css_vars();
+        if !palette_css.is_empty() {
+            let mut style_node = TokenNode::new(next_id());
+            style_node.tag = "style".into();
+            style_node.content = Some(palette_css.into());
+            root.node_mut().children.push(style_node);
+        }
+        // Inject media query CSS as a style block child
+        let media_css = self.media.to_css();
+        if !media_css.is_empty() {
+            let mut style_node = TokenNode::new(next_id());
+            style_node.tag = "style".into();
+            style_node.content = Some(media_css.into());
+            root.node_mut().children.push(style_node);
+        }
+        // Add store presets as data attributes on root (consumed by TokenCtx)
+        for (key, value) in &self.store_presets {
+            root.node_mut().attributes.insert(
+                format!("data-preset-{}", key).into(),
+                value.clone(),
+            );
+        }
+        // Attach the actual page content
+        root.node_mut().children.push(content.into_node());
+        root
+    }
+}
+
+impl Default for PageConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shortcut: `page_config()`
+pub fn page_config() -> PageConfig {
+    PageConfig::new()
+}
+
+// ── Palette ──────────────────────────────────────────────────────────────────
+
+#[derive(Clone, Debug)]
+pub struct Palette {
+    pub primary: Str,
+    pub secondary: Str,
+    pub background: Str,
+    pub surface: Str,
+    pub text: Str,
+    pub text_muted: Str,
+    pub success: Str,
+    pub warning: Str,
+    pub danger: Str,
+    pub font_base: Str,
+    pub font_heading: Str,
+    pub size_scale: Str, // "sm" | "md" | "lg"
+}
+
+impl Palette {
+    pub fn light() -> Self {
+        Self {
+            primary: "#2563eb".into(),
+            secondary: "#64748b".into(),
+            background: "#f8fafc".into(),
+            surface: "#ffffff".into(),
+            text: "#0f172a".into(),
+            text_muted: "#64748b".into(),
+            success: "#22c55e".into(),
+            warning: "#f59e0b".into(),
+            danger: "#ef4444".into(),
+            font_base: "ui-sans-serif, system-ui, sans-serif".into(),
+            font_heading: "ui-sans-serif, system-ui, sans-serif".into(),
+            size_scale: "md".into(),
+        }
+    }
+
+    pub fn dark() -> Self {
+        Self {
+            primary: "#60a5fa".into(),
+            secondary: "#94a3b8".into(),
+            background: "#0f172a".into(),
+            surface: "#1e293b".into(),
+            text: "#f8fafc".into(),
+            text_muted: "#94a3b8".into(),
+            success: "#4ade80".into(),
+            warning: "#fbbf24".into(),
+            danger: "#f87171".into(),
+            font_base: "ui-sans-serif, system-ui, sans-serif".into(),
+            font_heading: "ui-sans-serif, system-ui, sans-serif".into(),
+            size_scale: "md".into(),
+        }
+    }
+
+    pub fn size_str(&self) -> &str {
+        &self.size_scale
+    }
+
+    fn to_css_vars(&self) -> String {
+        format!(
+            ":root {{ \
+            --tok-primary: {}; \
+            --tok-secondary: {}; \
+            --tok-bg: {}; \
+            --tok-surface: {}; \
+            --tok-text: {}; \
+            --tok-text-muted: {}; \
+            --tok-success: {}; \
+            --tok-warning: {}; \
+            --tok-danger: {}; \
+            --tok-font-base: {}; \
+            --tok-font-heading: {}; \
+            font-family: {}; \
+            }}",
+            self.primary, self.secondary, self.background, self.surface,
+            self.text, self.text_muted, self.success, self.warning, self.danger,
+            self.font_base, self.font_heading, self.font_base,
+        )
+    }
+}
+
+impl Default for Palette {
+    fn default() -> Self {
+        Self::light()
+    }
+}
+
+// ── Media (responsive breakpoints) ───────────────────────────────────────────
+
+#[derive(Clone, Debug)]
+pub struct Media {
+    pub mobile_breakpoint: u16,
+    pub desktop_breakpoint: u16,
+    pub compact: bool, // true = mobile-first, false = desktop-first
+}
+
+impl Media {
+    pub fn mobile_first() -> Self {
+        Self { mobile_breakpoint: 640, desktop_breakpoint: 1024, compact: true }
+    }
+
+    pub fn desktop_first() -> Self {
+        Self { mobile_breakpoint: 640, desktop_breakpoint: 1024, compact: false }
+    }
+
+    fn to_css(&self) -> String {
+        if self.compact {
+            format!(
+                "@media (max-width: {}px) {{ .tok-compact {{ display:none !important; }} }}
+                 @media (min-width: {}px) {{ .tok-expanded {{ display:none !important; }} }}",
+                self.mobile_breakpoint, self.desktop_breakpoint
+            )
+        } else {
+            format!(
+                "@media (min-width: {}px) {{ .tok-desktop {{ display:none !important; }} }}
+                 @media (max-width: {}px) {{ .tok-mobile {{ display:none !important; }} }}",
+                self.mobile_breakpoint, self.desktop_breakpoint
+            )
+        }
+    }
+}
+
+impl Default for Media {
+    fn default() -> Self {
+        Self::mobile_first()
+    }
+}
+
+
+================================================================================
 FILE: src/tokens/builders/spec.rs
 ================================================================================
 
@@ -4647,6 +4894,65 @@ pub trait TokenBuilder: Sized + IntoToken {
         self.on_event(EventBinding { event: EventType::DoubleClick, action, debounce_ms: None, throttle_ms: None })
     }
 
+    // ── Dedicated click event helpers ─────────────────────────────────────
+    fn on_click_show(self, id: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Show { show: id.into(), hide: vec![] },
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_hide(self, id: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Hide(id.into()),
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_toggle(self, id: impl Into<Str>) -> Self {
+        let id = id.into();
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::ToggleClass { target: id.clone(), class: "hidden".into() },
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_nav(self, page: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Navigate(page.into()),
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_store_set(self, key: impl Into<Str>, val: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::StoreSet { key: key.into(), value: val.into() },
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_inc(self, key: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Increment { key: key.into(), by: 1 },
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+    fn on_click_dec(self, key: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Decrement { key: key.into(), by: 1 },
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
+
     // ── Declarative actions ───────────────────────────────────────────────
     // Always binds to SELF. Use .child_act() to attach to the last-added child.
     fn act(mut self, action: impl Into<TokenAction>) -> Self {
@@ -4724,8 +5030,18 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn decrement(self, key: impl Into<Str>) -> Self {
         self.act(TokenAction::Decrement { key: key.into(), by: 1 })
     }
+    // Short aliases for common state mutations
+    fn inc(self, key: impl Into<Str>) -> Self { self.increment(key) }
+    fn dec(self, key: impl Into<Str>) -> Self { self.decrement(key) }
+    fn toggle(self, key: impl Into<Str>) -> Self {
+        self.act(TokenAction::ToggleState { key: key.into(), on_state: "true".into(), off_state: "false".into() })
+    }
     fn toggle_state(self, key: impl Into<Str>, on: impl Into<Str>, off: impl Into<Str>) -> Self {
         self.act(TokenAction::ToggleState { key: key.into(), on_state: on.into(), off_state: off.into() })
+    }
+    fn cycle(self, key: impl Into<Str>, states: Vec<impl Into<Str>>) -> Self {
+        let states: Vec<Str> = states.into_iter().map(|s| s.into()).collect();
+        self.act(TokenAction::Custom(format!("cycle:{}:{}", key.into(), states.join(",")).into()))
     }
     fn store_set_ttl(self, key: impl Into<Str>, val: impl Into<Str>, ttl_seconds: u64) -> Self {
         self.act(TokenAction::StoreSetTtl { key: key.into(), value: val.into(), ttl_seconds })
@@ -6038,12 +6354,14 @@ pub mod types;
 pub mod factory;
 pub mod input;
 pub mod ui;
+pub mod page_config;
 
 pub use spec::*;
 pub use types::*;
 pub use factory::*;
 pub use input::*;
 pub use ui::*;
+pub use page_config::*;
 
 
 ================================================================================

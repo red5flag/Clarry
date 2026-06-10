@@ -11,6 +11,55 @@ pub mod api;
 pub use tokens::*;
 pub use tokens::builders::store;
 
+/// Declarative UI macro — eliminates `.child()` boilerplate.
+///
+/// Syntax: `ui!(parent => { child_expr => { grandchild... }, child_expr, ... })`
+///
+/// Example:
+/// ```rust,ignore
+/// ui!(col() => {
+///     card("Title") => {
+///         text("Hello world")
+///     },
+///     btn("Click").act(increment("c"))
+/// })
+/// ```
+#[macro_export]
+macro_rules! ui {
+    ($parent:expr => { $($body:tt)* }) => {{
+        let mut __parent = $parent;
+        $crate::ui!(@items __parent, $($body)*);
+        __parent
+    }};
+
+    // Node with children, followed by more items
+    (@items $parent:ident, $node:expr => { $($children:tt)* }, $($rest:tt)*) => {{
+        let __child = $crate::ui!($node => { $($children)* });
+        $parent = $crate::prelude::TokenBuilder::child($parent, __child);
+        $crate::ui!(@items $parent, $($rest)*)
+    }};
+
+    // Leaf node, followed by more items
+    (@items $parent:ident, $node:expr, $($rest:tt)*) => {{
+        $parent = $crate::prelude::TokenBuilder::child($parent, $node);
+        $crate::ui!(@items $parent, $($rest)*)
+    }};
+
+    // Node with children, last item
+    (@items $parent:ident, $node:expr => { $($children:tt)* }) => {{
+        let __child = $crate::ui!($node => { $($children)* });
+        $parent = $crate::prelude::TokenBuilder::child($parent, __child);
+    }};
+
+    // Leaf node, last item
+    (@items $parent:ident, $node:expr) => {{
+        $parent = $crate::prelude::TokenBuilder::child($parent, $node);
+    }};
+
+    // Empty
+    (@items $parent:ident,) => {};
+}
+
 use leptos::prelude::*;
 
 /// Hydrate entry point - called by the WASM bundle on client-side

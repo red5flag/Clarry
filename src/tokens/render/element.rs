@@ -197,6 +197,21 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
         }
     };
 
+    // ── Input handler (writes typed value into ctx.strings by element id) ───
+    let id_for_input = id.clone();
+    let input_handler = move |ev: leptos::ev::Event| {
+        if let Some(target) = ev.target() {
+            #[cfg(target_arch = "wasm32")]
+            if let Ok(el) = target.dyn_into::<web_sys::HtmlInputElement>() {
+                let val = el.value();
+                leptos::logging::log!("[INPUT_HANDLER] id={} value={}", id_for_input, val);
+                if let Some(ctx) = ctx_for_handler {
+                    ctx.set_string(&id_for_input, val);
+                }
+            }
+        }
+    };
+
     // ── Reactive style closure ─────────────────────────────────────────────
     //
     // Visibility signal logic:
@@ -301,7 +316,10 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
         let interpolated = interpolate_content(&c, ctx);
         view! { <span>{interpolated}</span> }.into_any()
     })
-    .or_else(|| meta.dynamic_content.map(|f| f()));
+    .or_else(|| meta.dynamic_content.clone().map(|f| {
+        // Wrap in a reactive fragment so signal reads inside f() trigger re-renders.
+        view! { {move || f()} }.into_any()
+    }));
     let content_placeholder = meta.content.clone().unwrap_or_default();
 
     // Detect `in:NAME` action — forces element to render as <input type="text" name=NAME>
@@ -330,6 +348,7 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
                     class=class_closure
                     on:click=click_handler
                     on:keydown=keydown_handler
+                    on:input=input_handler
                     data-binding=meta.data_binding
                     type=input_type
                     name=input_name
@@ -344,6 +363,7 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
                     style=style_closure
                     class=class_closure
                     on:keydown=keydown_handler
+                    on:input=input_handler
                     data-binding=meta.data_binding
                     type=input_type
                     name=input_name

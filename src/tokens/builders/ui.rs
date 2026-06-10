@@ -69,11 +69,12 @@ pub fn tooltip(_target_id: impl Into<Str>, content: impl Into<Str>) -> Block {
 }
 
 pub fn drawer(id: impl Into<Str>, side: impl Into<Str>, content: impl Into<Str>) -> Block {
+    use crate::tokens::action::types::{TokenAction, EventBinding, EventType};
+    let id_str: Str = id.into();
     let side = side.into().to_string();
-    let mut n = TokenNode::new(id);
+    let mut n = TokenNode::new(id_str.clone());
     n.tag = "div".into();
-    n.content = Some(content.into());
-    n.class = "fixed z-50 bg-white shadow-lg p-4".into();
+    n.class = "fixed z-50 bg-white shadow-lg p-4 flex flex-col gap-2".into();
     let (position, size) = match side.as_str() {
         "left" => ("left:0;top:0;bottom:0;", "width:16rem;"),
         "right" => ("right:0;top:0;bottom:0;", "width:16rem;"),
@@ -82,6 +83,21 @@ pub fn drawer(id: impl Into<Str>, side: impl Into<Str>, content: impl Into<Str>)
         _ => ("right:0;top:0;bottom:0;", "width:16rem;"),
     };
     n.style.extra = format!("{}{}display:none;", position, size).into();
+
+    // Auto-inject close button
+    let mut close_btn = TokenNode::new(format!("{}_close", id_str));
+    close_btn.tag = "button".into();
+    close_btn.content = Some("✕".into());
+    close_btn.class = "self-end text-gray-500 hover:text-gray-800 text-lg leading-none mb-1 cursor-pointer".into();
+    close_btn.actions.push(TokenAction::Hide(id_str.clone()));
+    n.children.push(close_btn);
+
+    // Content wrapper
+    let mut content_node = TokenNode::new(format!("{}_content", id_str));
+    content_node.tag = "div".into();
+    content_node.content = Some(content.into());
+    n.children.push(content_node);
+
     Container { stack: vec![n] }
 }
 

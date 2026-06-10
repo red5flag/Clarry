@@ -144,6 +144,16 @@ fn preprocess_token_dsl(content: &str) -> String {
             }
         }
 
+        // Unknown standalone function call at deeper indent → wrap in .child()
+        if is_standalone && !container_stack.is_empty() {
+            let parent_indent = *container_stack.last().unwrap();
+            if indent > parent_indent {
+                let transformed = " ".repeat(indent) + ".child(" + stripped + ")";
+                result.push(transformed);
+                continue;
+            }
+        }
+
         if is_standalone_container(stripped) {
             container_stack.push(indent);
             result.push(line.to_string());

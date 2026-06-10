@@ -10,9 +10,18 @@ Exit code: 0
 
 --- STDERR ---
 warning: l8-loader@0.1.0: ✅ Build artifacts check:
-warning: l8-loader@0.1.0:   📦 l8-loader.js (46.0 KB)
-warning: l8-loader@0.1.0:   📦 l8-loader.wasm (7336.5 KB)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.16s
+warning: variable does not need to be mutable
+  --> src/tokens/builders/page_config.rs:66:17
+   |
+66 |     pub fn page(mut self, content: impl IntoToken) -> Container {
+   |                 ----^^^^
+   |                 |
+   |                 help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `l8-loader` (lib) generated 1 warning (run `cargo fix --lib -p l8-loader` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.23s
 
 
 ================================================================================
@@ -28,7 +37,18 @@ Exit code: 0
    Compiling l8-loader v0.1.0 (/home/red/Downloads/Clarry-dev2/Clarry-dev2)
 warning: l8-loader@0.1.0: ✅ Build artifacts check:
 warning: l8-loader@0.1.0:   📦 l8-loader.js (46.0 KB)
-warning: l8-loader@0.1.0:   📦 l8-loader.wasm (7336.5 KB)
-    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.45s
+warning: l8-loader@0.1.0:   📦 l8-loader.wasm (7340.0 KB)
+warning: variable does not need to be mutable
+  --> src/tokens/builders/page_config.rs:66:17
+   |
+66 |     pub fn page(mut self, content: impl IntoToken) -> Container {
+   |                 ----^^^^
+   |                 |
+   |                 help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: `l8-loader` (lib) generated 1 warning (run `cargo clippy --fix --lib -p l8-loader -- ` to apply 1 suggestion)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.17s
 
 

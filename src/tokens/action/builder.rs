@@ -148,10 +148,15 @@ pub fn in_(name: impl Into<Str>) -> TokenAction {
 // ── Storage actions ────────────────────────────────────────────────────────────
 
 pub fn store_set(key: impl Into<Str>, val: impl Into<Str>) -> TokenAction {
-    TokenAction::StoreSet { 
-        key: key.into(), 
-        value: val.into(), 
+    TokenAction::StoreSet {
+        key: key.into(),
+        value: val.into(),
     }
+}
+
+/// Read the current value from `input_key` in `ctx.strings` and store it under `key`.
+pub fn store_set_input(key: impl Into<Str>, input_key: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("store_set_input:{}:{}", key.into(), input_key.into()).into())
 }
 
 pub fn store_get(key: impl Into<Str>, target: impl Into<Str>) -> TokenAction {
@@ -238,6 +243,24 @@ pub fn store_from_val(storage_key: impl Into<Str>, val_key: impl Into<Str>) -> T
 
 pub fn set_theme_var(name: impl Into<Str>, value: impl Into<Str>) -> TokenAction {
     TokenAction::SetThemeVar { name: name.into(), value: value.into() }
+}
+
+/// Toggle a drawer's open/closed state by flipping its visibility signal.
+pub fn toggle_drawer(id: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("toggle_drawer:{}", id.into()).into())
+}
+
+/// Cycle through a list of drawers: close the currently open one, open the next.
+/// If the last drawer is open, close all. IDs are comma-separated.
+pub fn cycle_drawer(drawer_ids: Vec<impl Into<Str>>) -> TokenAction {
+    let ids: Vec<String> = drawer_ids.into_iter().map(|s| s.into().to_string()).collect();
+    TokenAction::Custom(format!("cycle_drawer:{}", ids.join(",")).into())
+}
+
+/// Send a chat message: reads `input_key` from TokenCtx strings, appends a
+/// JSON message object to the array at `storage_key`, and clears the input.
+pub fn chat_send(input_key: impl Into<Str>, storage_key: impl Into<Str>, sender: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("chat_send:{}:{}:{}", input_key.into(), storage_key.into(), sender.into()).into())
 }
 
 /// Apply debounce to an action via EventBinding (use .debounce_ms() on the binding instead)

@@ -50,9 +50,10 @@ where
 {
     use leptos::prelude::*;
     let mut n = TokenNode::new(next_id());
+    let f = std::sync::Arc::new(f);
     n.dynamic_content = Some(Arc::new(move || {
-        let s = f();
-        view! { <span>{s}</span> }.into_any()
+        let f2 = f.clone();
+        view! { <span>{move || f2()}</span> }.into_any()
     }));
     Text(n)
 }
@@ -163,6 +164,25 @@ pub fn text_bind(key: impl Into<String>) -> Text {
     })
 }
 
+/// Read a dot-notation storage path reactively.
+/// Bumps list_rev so any storage write causes re-render.
+pub fn text_read(path: impl Into<String>) -> Text {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    let path = path.into();
+    text_dynamic(move || {
+        use_context::<TokenCtx>()
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                ctx.strings.get().get(&path).cloned()
+                    .or_else(|| Store::read(&path))
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default()
+    })
+}
+
 pub fn img_bind(key: impl Into<String>, fallback: impl Into<Str>) -> Block {
     use leptos::prelude::*;
     use crate::tokens::reactive::TokenCtx;
@@ -200,6 +220,98 @@ where
         view! {
             <div data-list-rev=rev data-list-key=key_clone>
                 { "List bound to " } { key_clone2 }
+            </div>
+        }.into_any()
+    }));
+    Container { stack: vec![n] }
+}
+
+/// Read a JSON array from a storage root key and render each object as a
+/// styled chat row.  Expects `{"text": "...", "sender": "..."}` shape.
+pub fn chat_messages(storage_root: impl Into<String>) -> Block {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    use serde_json::Value;
+    let root = storage_root.into();
+    let mut n = TokenNode::new(next_id());
+    n.tag = "div".into();
+    n.class = "flex flex-col gap-2 max-h-48 overflow-y-auto".into();
+    n.dynamic_content = Some(Arc::new(move || {
+        let has_ctx = use_context::<TokenCtx>().is_some();
+        let raw = use_context::<TokenCtx>()
+            .map(|ctx| {
+                let rev = ctx.list_rev.get();
+                let from_strings = ctx.strings.get().get(&root).cloned();
+                let from_store = Store::read(&root);
+                let has_strings = from_strings.is_some();
+                let has_store = from_store.is_some();
+                let chosen = from_strings.or_else(|| from_store).unwrap_or_default();
+                leptos::logging::log!("[CHAT_MSGS] rev={} root={} strings={:?} store={:?} chosen_len={}", rev, root, has_strings, has_store, chosen.len());
+                chosen
+            })
+            .unwrap_or_default();
+        leptos::logging::log!("[CHAT_MSGS] has_ctx={} raw_len={}", has_ctx, raw.len());
+        let items: Vec<Value> = serde_json::from_str(&raw).unwrap_or_default();
+        let rows = items.into_iter().map(|item| {
+            let text = item.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let sender = item.get("sender").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let is_user = sender == "user" || sender == "me";
+            let align = if is_user { "self-end bg-blue-500 text-white" } else { "self-start bg-gray-200 text-gray-800" };
+            view! {
+                <div class={format!("px-3 py-2 rounded-lg text-sm max-w-[80%] {}", align)}>
+                    <span class="font-semibold text-xs opacity-75 block mb-0.5">{sender}</span>
+                    {text}
+                </div>
+            }
+        }).collect::<Vec<_>>();
+        view! {
+            <div class="flex flex-col gap-2 p-2">
+                {rows}
+            </div>
+        }.into_any()
+    }));
+    Container { stack: vec![n] }
+}
+
+pub fn chat_bubble_messages(storage_root: impl Into<String>) -> Block {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    use serde_json::Value;
+    let root = storage_root.into();
+    let mut n = TokenNode::new(next_id());
+    n.tag = "div".into();
+    n.class = "flex flex-col gap-1 max-h-48 overflow-y-auto p-2".into();
+    n.dynamic_content = Some(Arc::new(move || {
+        let raw = use_context::<TokenCtx>()
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                ctx.strings.get().get(&root).cloned()
+                    .or_else(|| Store::read(&root))
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
+        let items: Vec<Value> = serde_json::from_str(&raw).unwrap_or_default();
+        let bubbles = items.into_iter().map(|item| {
+            let text = item.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let sender = item.get("sender").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let is_user = sender == "user" || sender == "me";
+            let (bg_class, align_class) = if is_user {
+                ("bg-blue-600 text-white", "self-end")
+            } else {
+                ("bg-gray-100 text-gray-900", "self-start")
+            };
+            view! {
+                <div class={format!("px-4 py-2 rounded-2xl text-sm max-w-[70%] my-1 {} {}", bg_class, align_class)}>
+                    <span class="font-semibold text-xs opacity-75 block mb-0.5">{sender}</span>
+                    {text}
+                </div>
+            }
+        }).collect::<Vec<_>>();
+        view! {
+            <div class="flex flex-col gap-1">
+                {bubbles}
             </div>
         }.into_any()
     }));

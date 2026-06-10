@@ -1,5 +1,10 @@
 
 pub fn page_token() -> impl IntoToken {
+    // Pre-seed storage so both SSR and CSR see the same initial data
+    Store::write("demo.messages", r#"[{"id":"msg_1","text":"Welcome to the messaging demo!","sender":"alice","timestamp":"now"},{"id":"msg_2","text":"How are you today?","sender":"alice","timestamp":"now"}]"#);
+    Store::write("demo.legacy_chat", r#"[{"id":"l1","text":"Hello from Alice","sender":"alice","timestamp":"now"},{"id":"l2","text":"Hi Alice!","sender":"user","timestamp":"now"}]"#);
+    Store::write("demo.user.name", "Guest User");
+
     col()
         .id("demo_page")
         .css("min-h-screen bg-gray-50 p-6 space-y-8")
@@ -7,127 +12,138 @@ pub fn page_token() -> impl IntoToken {
         .child(text("Every primitive, action, and layout — interactive & working").css("text-sm text-gray-500"))
         // ── 1. Layout ────────────────────────────────────────────────────
         .child(section_title("1. Layout Primitives"))
-        .child(grid2().css("gap-4")
-            .child(card("Row").child(row().css("gap-2")
-                .child(block().css("w-8 h-8 bg-red-400 rounded"))
-                .child(block().css("w-8 h-8 bg-green-400 rounded"))
-                .child(block().css("w-8 h-8 bg-blue-400 rounded"))
-            ))
-            .child(card("Column").child(col().css("gap-2")
-                .child(block().css("w-full h-4 bg-purple-400 rounded"))
-                .child(block().css("w-full h-4 bg-pink-400 rounded"))
-            ))
-            .child(card("Grid (3 cols)").child(grid(3).css("gap-2")
-                .child(block().css("h-8 bg-orange-400 rounded"))
-                .child(block().css("h-8 bg-teal-400 rounded"))
-                .child(block().css("h-8 bg-indigo-400 rounded"))
-            ))
-            .child(card("Stack").child(stack().css("gap-2 p-2 bg-gray-100 rounded")
-                .child(text("Stacked A").css("text-xs"))
-                .child(text("Stacked B").css("text-xs"))
-            ))
-        )
-        .child(row().css("gap-4 mt-4")
-            .child(card("Split (0.4)").child(split(0.4)
-                .child(block().css("h-16 bg-cyan-400 rounded"))
-                .child(block().css("h-16 bg-lime-400 rounded"))
-            ))
-            .child(card("Aspect 16:9").child(aspect(16,9).css("bg-yellow-300 rounded flex items-center justify-center")
-                .child(text("16:9").css("text-xs font-bold"))
-            ))
-        )
+        .child(ui!(grid2().css("gap-4") => {
+            ui!(card("Row") => {
+                ui!(row().css("gap-2") => {
+                    block().css("w-8 h-8 bg-red-400 rounded"),
+                    block().css("w-8 h-8 bg-green-400 rounded"),
+                    block().css("w-8 h-8 bg-blue-400 rounded")
+                })
+            }),
+            ui!(card("Column") => {
+                ui!(col().css("gap-2") => {
+                    block().css("w-full h-4 bg-purple-400 rounded"),
+                    block().css("w-full h-4 bg-pink-400 rounded")
+                })
+            }),
+            ui!(card("Grid (3 cols)") => {
+                ui!(grid(3).css("gap-2") => {
+                    block().css("h-8 bg-orange-400 rounded"),
+                    block().css("h-8 bg-teal-400 rounded"),
+                    block().css("h-8 bg-indigo-400 rounded")
+                })
+            }),
+            ui!(card("Stack") => {
+                ui!(stack().css("gap-2 p-2 bg-gray-100 rounded") => {
+                    text("Stacked A").css("text-xs"),
+                    text("Stacked B").css("text-xs")
+                })
+            })
+        }))
+        .child(ui!(row().css("gap-4 mt-4") => {
+            ui!(card("Split (0.4)") => {
+                ui!(split(0.4) => {
+                    block().css("h-16 bg-cyan-400 rounded"),
+                    block().css("h-16 bg-lime-400 rounded")
+                })
+            }),
+            ui!(card("Aspect 16:9") => {
+                ui!(aspect(16, 9).css("bg-yellow-300 rounded flex items-center justify-center") => {
+                    text("16:9").css("text-xs font-bold")
+                })
+            })
+        }))
         // ── 2. Typography ────────────────────────────────────────────────
         .child(section_title("2. Typography & Content"))
-        .child(card("Text variants")
-            .child(text("Regular text"))
-            .child(text("Bold text").bold())
-            .child(text("Muted text").muted())
-            .child(text("Uppercase").uppercase())
-            .child(text("Centered").center())
-            .child(text("H1 heading").h1())
-            .child(text("H2 heading").h2())
-            .child(text("H3 heading").h3())
-            .child(text("Caption").caption())
-            .child(text("Label").label())
-            .child(text("Monospace").mono())
-            .child(text("Italic").italic())
-            .child(text("Strikethrough").strike())
-            .child(text("Underline").underline())
-            .child(text("Custom color").color("#7c3aed"))
-        )
-        .child(card("Dynamic / Reactive text")
-            .child(counter_text("demo_counter", "Count:"))
-        )
-        .child(card("Image block")
-            .child(img_block("https://via.placeholder.com/150").css("w-full h-32 rounded-lg"))
-        )
+        .child(ui!(card("Text variants") => {
+            text("Regular text"),
+            text("Bold text").bold(),
+            text("Muted text").muted(),
+            text("Uppercase").uppercase(),
+            text("Centered").center(),
+            text("H1 heading").h1(),
+            text("H2 heading").h2(),
+            text("H3 heading").h3(),
+            text("Caption").caption(),
+            text("Label").label(),
+            text("Monospace").mono(),
+            text("Italic").italic(),
+            text("Strikethrough").strike(),
+            text("Underline").underline(),
+            text("Custom color").color("#7c3aed")
+        }))
+        .child(ui!(card("Dynamic / Reactive text") => {
+            counter_text("demo_counter", "Count:")
+        }))
+        .child(ui!(card("Image block") => {
+            img_block("https://via.placeholder.com/150").css("w-full h-32 rounded-lg")
+        }))
         // ── 3. Inputs ────────────────────────────────────────────────────
         .child(section_title("3. Input Primitives"))
-        .child(grid2().css("gap-4")
-            .child(card("Text Input")
-                .child(text_input("Enter name...", "demo_name").css("w-full p-2 border rounded"))
-            )
-            .child(card("Number Input")
-                .child(input_number("demo_num").css("w-full p-2 border rounded"))
-            )
-            .child(card("Password Input")
-                .child(input_password("demo_pwd").css("w-full p-2 border rounded"))
-            )
-            .child(card("Checkbox")
-                .child(checkbox("demo_chk", "I agree to terms").css("flex items-center gap-2"))
-            )
-            .child(card("Textarea")
-                .child(textarea("demo_textarea", 4).css("w-full p-2 border rounded"))
-            )
-            .child(card("Select")
-                .child(select("demo_select", vec!["Option A", "Option B", "Option C"]).css("w-full p-2 border rounded"))
-            )
-            .child(card("Named Input (in:)")
-                .child(block().css("flex items-center gap-2")
-                    .child(text("Name:").css("text-sm"))
-                    .child(block().css("border p-1 rounded flex-1").act(in_("full_name")))
-                )
-            )
-        )
+        .child(ui!(grid2().css("gap-4") => {
+            ui!(card("Text Input") => {
+                text_input("Enter name...", "demo_name").css("w-full p-2 border rounded")
+            }),
+            ui!(card("Number Input") => {
+                input_number("demo_num").css("w-full p-2 border rounded")
+            }),
+            ui!(card("Password Input") => {
+                input_password("demo_pwd").css("w-full p-2 border rounded")
+            }),
+            ui!(card("Checkbox") => {
+                checkbox("demo_chk", "I agree to terms").css("flex items-center gap-2")
+            }),
+            ui!(card("Textarea") => {
+                textarea("demo_textarea", 4).css("w-full p-2 border rounded")
+            }),
+            ui!(card("Select") => {
+                select("demo_select", vec!["Option A", "Option B", "Option C"]).css("w-full p-2 border rounded")
+            }),
+            ui!(card("Named Input (in:)") => {
+                ui!(block().css("flex items-center gap-2") => {
+                    text("Name:").css("text-sm"),
+                    block().css("border p-1 rounded flex-1").act(in_("full_name"))
+                })
+            })
+        }))
         // ── 4. Buttons ───────────────────────────────────────────────────
         .child(section_title("4. Buttons — Variants, Sizes, States"))
-        .child(card("Variant buttons")
-            .child(row().css("gap-2 flex-wrap")
-                .child(btn("Primary").variant("primary").size_str("md"))
-                .child(btn("Secondary").variant("secondary").size_str("md"))
-                .child(btn("Danger").variant("danger").size_str("md"))
-                .child(btn("Ghost").variant("ghost").size_str("md"))
-                .child(btn("Success").variant("success").size_str("md"))
-            )
-        )
-        .child(card("Size buttons")
-            .child(row().css("gap-2 items-end")
-                .child(btn("Small").variant("primary").size_str("sm"))
-                .child(btn("Medium").variant("primary").size_str("md"))
-                .child(btn("Large").variant("primary").size_str("lg"))
-            )
-        )
-        .child(card("State buttons")
-            .child(row().css("gap-2 flex-wrap")
-                .child(btn("Loading").variant("primary").loading(true))
-                .child(btn("Disabled").variant("primary").disabled(true))
-                .child(btn("Loading+Disabled").variant("secondary").loading(true).disabled(true))
-            )
-        )
-        .child(card("Action buttons")
-            .child(row().css("gap-2 flex-wrap")
-                .child(btn("Increment").variant("primary").size_str("sm").act(increment("demo_counter")))
-                .child(btn("Decrement").variant("secondary").size_str("sm").act(decrement("demo_counter")))
-                .child(btn("Toggle").variant("ghost").size_str("sm").act(toggle("demo_toggle_target")))
-                .child(btn("Copy").variant("primary").size_str("sm").act(copy_to_clipboard("Hello!")))
-                .child(btn("Open URL").variant("secondary").size_str("sm").act(open_url("https://example.com")))
-                .child(btn("Navigate").variant("ghost").size_str("sm").act(navigate("demo")))
-            )
-        )
-        .child(
-            block().id("demo_toggle_target").css("hidden mt-2 p-3 bg-blue-50 rounded-lg")
-                .child(text("Toggled content is visible!").css("text-sm text-blue-700"))
-        )
+        .child(ui!(card("Variant buttons") => {
+            ui!(row().css("gap-2 flex-wrap") => {
+                btn("Primary").variant("primary").size_str("md"),
+                btn("Secondary").variant("secondary").size_str("md"),
+                btn("Danger").variant("danger").size_str("md"),
+                btn("Ghost").variant("ghost").size_str("md"),
+                btn("Success").variant("success").size_str("md")
+            })
+        }))
+        .child(ui!(card("Size buttons") => {
+            ui!(row().css("gap-2 items-end") => {
+                btn("Small").variant("primary").size_str("sm"),
+                btn("Medium").variant("primary").size_str("md"),
+                btn("Large").variant("primary").size_str("lg")
+            })
+        }))
+        .child(ui!(card("State buttons") => {
+            ui!(row().css("gap-2 flex-wrap") => {
+                btn("Loading").variant("primary").loading(true),
+                btn("Disabled").variant("primary").disabled(true),
+                btn("Loading+Disabled").variant("secondary").loading(true).disabled(true)
+            })
+        }))
+        .child(ui!(card("Action buttons") => {
+            ui!(row().css("gap-2 flex-wrap") => {
+                btn("Increment").variant("primary").size_str("sm").act(increment("demo_counter")),
+                btn("Decrement").variant("secondary").size_str("sm").act(decrement("demo_counter")),
+                btn("Toggle").variant("ghost").size_str("sm").act(toggle("demo_toggle_target")),
+                btn("Copy").variant("primary").size_str("sm").act(copy_to_clipboard("Hello!")),
+                btn("Open URL").variant("secondary").size_str("sm").act(open_url("https://example.com")),
+                btn("Navigate").variant("ghost").size_str("sm").act(navigate("demo"))
+            })
+        }))
+        .child(ui!(block().id("demo_toggle_target").css("hidden mt-2 p-3 bg-blue-50 rounded-lg") => {
+            text("Toggled content is visible!").css("text-sm text-blue-700")
+        }))
         // ── 5. Modal ─────────────────────────────────────────────────────
         .child(section_title("5. Modal Primitive"))
         .child(card("Built-in modal()")
@@ -165,13 +181,20 @@ pub fn page_token() -> impl IntoToken {
         .child(card("LocalStore CRUD")
             .child(text_input("Type a note...", "store_input").css("w-full p-2 border rounded mb-2"))
             .child(row().css("gap-2 flex-wrap")
-                .child(btn("Set").variant("primary").size_str("sm").act(store_set("user_note", "demo_value")))
+                .child(btn("Set").variant("primary").size_str("sm").act(store_set_input("user_note", "store_input")))
                 .child(btn("Get").variant("secondary").size_str("sm").act(store_get("user_note", "user_note_display")))
                 .child(btn("Delete").variant("danger").size_str("sm").act(store_delete("user_note")))
                 .child(btn("Set TTL 60s").variant("ghost").size_str("sm").act(store_set_ttl("ttl_key", "expires", 60)))
                 .child(btn("Watch").variant("ghost").size_str("sm").act(store_watch("user_note")))
             )
-            .child(text("Stored: {{user_note}}").css("mt-2 text-sm text-gray-600"))
+            .child(row().css("mt-2 gap-2")
+                .child(text("Stored:").css("text-sm text-gray-600"))
+                .child(text_bind("user_note").css("text-sm font-mono text-blue-600"))
+            )
+            .child(row().css("mt-1 gap-2")
+                .child(text("Fetched:").css("text-sm text-gray-600"))
+                .child(text_bind("user_note_display").css("text-sm font-mono text-green-600"))
+            )
         )
         .child(card("Counter + Cycle")
             .child(row().css("gap-2")
@@ -181,6 +204,11 @@ pub fn page_token() -> impl IntoToken {
                 .child(btn("Toggle").variant("ghost").size_str("sm").act(toggle_state("demo_state")))
             )
             .child(counter_text("demo_counter", "Count:"))
+            .child(text("State:").css("text-xs text-gray-500 mt-1"))
+            .child(text_bind("demo_state").css("text-sm font-mono text-blue-600"))
+            .child(block().id("demo_state").css("mt-2 p-2 bg-green-100 rounded text-sm text-green-800")
+                .child(text("Toggle target is visible!"))
+            )
         )
         .child(card("Preload / Fetch")
             .child(row().css("gap-2")
@@ -268,14 +296,37 @@ pub fn page_token() -> impl IntoToken {
             .child(iframe("https://example.com")
                 .css("w-full h-40 rounded-lg border"))
         )
-        // ── 12. Chat ─────────────────────────────────────────────────────
-        .child(section_title("12. Chat & Messaging"))
-        .child(card("Chat Bubble")
-            .child(chat_bubble("Hello from Alice", false))
-            .child(chat_bubble("Hi Alice!", true))
+        // ── 12. Chat & Messaging (Primitive Storage) ─────────────────────
+        .child(section_title("12. Chat & Messaging (Primitive Storage)"))
+        .child(grid2().css("gap-4")
+            .child(card("Data Source")
+                .child(text("Raw JSON from demo.messages:").css("text-xs text-gray-500"))
+                .child(text_read("demo.messages").css("font-mono text-xs bg-gray-100 p-2 rounded break-all"))
+                .child(text("Nested read demo.user.name:").css("text-xs text-gray-500 mt-2"))
+                .child(text_read("demo.user.name").css("font-mono text-xs bg-gray-100 p-2 rounded"))
+            )
+            .child(card("Alice's Messages")
+                .child(chat_messages("demo.messages"))
+            )
         )
-        .child(card("Chat UI")
-            .child(chat_ui("demo_chat", submit_form("chat_form")))
+        .child(card("Send a reply")
+            .child(text_input("Type your reply...", "chat_input").css("w-full"))
+            .child(row().css("gap-2 mt-2")
+                .child(btn("Send").variant("primary").size_str("sm")
+                    .act(chat_send("chat_input", "demo.messages", "user")))
+                .child(btn("Clear").variant("danger").size_str("sm")
+                    .act(store_set("demo.messages", "[]")))
+            )
+        )
+        .child(card("Legacy Chat Bubble")
+            .child(chat_bubble_messages("demo.legacy_chat"))
+            .child(text_input("Type a message...", "legacy_chat_input").css("w-full mt-2"))
+            .child(row().css("gap-2 mt-2")
+                .child(btn("Send").variant("primary").size_str("sm")
+                    .act(chat_send("legacy_chat_input", "demo.legacy_chat", "user")))
+                .child(btn("Clear").variant("danger").size_str("sm")
+                    .act(store_set("demo.legacy_chat", "[]")))
+            )
         )
         // ── 13. Data Display ─────────────────────────────────────────────
         .child(section_title("13. Data Display"))
@@ -357,12 +408,9 @@ pub fn page_token() -> impl IntoToken {
         // ── 16. Responsive ───────────────────────────────────────────────
         .child(section_title("16. Responsive Helpers"))
         .child(card("Breakpoint demo")
-            .child(block().css("p-4 bg-gray-200 rounded")
-                .sm("bg-blue-200")
-                .md_bp("bg-green-200")
-                .lg_bp("bg-purple-200")
-                .xl_bp("bg-orange-200")
+            .child(block().css("p-4 bg-gray-200 rounded sm:bg-blue-200 md:bg-green-200 lg:bg-purple-200 xl:bg-orange-200")
                 .child(text("Resize window to see color change").css("text-sm"))
+                .child(text("sm:640+ md:768+ lg:1024+ xl:1280+").css("text-xs text-gray-500 mt-1"))
             )
         )
         // ── Footer ───────────────────────────────────────────────────────
@@ -381,5 +429,4 @@ fn card(title: &str) -> Block {
         .css("p-4 bg-white rounded-lg shadow-sm space-y-2")
         .child(text(title).css("text-sm font-semibold text-gray-700 mb-1"))
 }
-
 

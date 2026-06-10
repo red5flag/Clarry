@@ -423,6 +423,15 @@ pub trait TokenBuilder: Sized + IntoToken {
         self.act(TokenAction::Share { title: title.into(), text: text.into(), url: Some(url.into()) })
     }
 
+    // ── Drawer helpers ────────────────────────────────────────────────────
+    fn toggle_drawer(self, id: impl Into<Str>) -> Self {
+        self.act(TokenAction::Custom(format!("toggle_drawer:{}", id.into()).into()))
+    }
+    fn cycle_drawer(self, ids: Vec<impl Into<Str>>) -> Self {
+        let ids: Vec<String> = ids.into_iter().map(|s| s.into().to_string()).collect();
+        self.act(TokenAction::Custom(format!("cycle_drawer:{}", ids.join(",")).into()))
+    }
+
     // ── File storage (dot-notation paths) ─────────────────────────────────
     fn file_store_set(self, key: impl Into<Str>, _val: impl Into<Str>) -> Self {
         self.act(TokenAction::Custom(format!("file_store_set:{}", key.into()).into()))
