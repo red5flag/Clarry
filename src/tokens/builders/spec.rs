@@ -383,6 +383,8 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn toggle_state(self, key: impl Into<Str>, on: impl Into<Str>, off: impl Into<Str>) -> Self {
         self.act(TokenAction::ToggleState { key: key.into(), on_state: on.into(), off_state: off.into() })
     }
+    fn tog(self, key: impl Into<Str>) -> Self { self.toggle(key) }
+    fn cyc(self, key: impl Into<Str>, states: Vec<impl Into<Str>>) -> Self { self.cycle(key, states) }
     fn cycle(self, key: impl Into<Str>, states: Vec<impl Into<Str>>) -> Self {
         let states: Vec<Str> = states.into_iter().map(|s| s.into()).collect();
         self.act(TokenAction::Custom(format!("cycle:{}:{}", key.into(), states.join(",")).into()))
@@ -447,7 +449,13 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn variant(mut self, v: impl Into<Str>) -> Self {
         self.node_mut().variant = Some(v.into()); self
     }
+    fn var(mut self, v: impl Into<Str>) -> Self {
+        self.node_mut().variant = Some(v.into()); self
+    }
     fn size_str(mut self, v: impl Into<Str>) -> Self {
+        self.node_mut().size = Some(v.into()); self
+    }
+    fn sz(mut self, v: impl Into<Str>) -> Self {
         self.node_mut().size = Some(v.into()); self
     }
     fn loading(mut self, v: bool) -> Self {
@@ -735,7 +743,7 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn col_span(self, n: u8) -> Self { self.append_css(format!("grid-column:span {n};")) }
     fn row_span(self, n: u8) -> Self { self.append_css(format!("grid-row:span {n};")) }
     fn will_change(self, v: &str) -> Self { self.append_css(format!("will-change:{v};")) }
-    fn var(self, name: &str, value: &str) -> Self { self.append_css(format!("--{name}:{value};")) }
+    fn css_var(self, name: &str, value: &str) -> Self { self.append_css(format!("--{name}:{value};")) }
     fn border_color(self, hex: &str) -> Self { self.append_css(format!("border-color:{hex};")) }
     fn border_width(self, px: u32) -> Self { self.append_css(format!("border-width:{px}px;")) }
     fn border_style(self, s: &str) -> Self { self.append_css(format!("border-style:{s};")) }
@@ -861,5 +869,6 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn render(self) -> impl IntoView {
         render_dom(self.into_node())
     }
+
 }
 

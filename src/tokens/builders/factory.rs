@@ -8,6 +8,7 @@ use crate::tokens::core::id::next_id;
 pub use crate::tokens::core::id::reset_id_counter;
 use crate::tokens::action::{TokenAction, LogLevel, ScrollBehavior};
 use super::types::{Container, Row, Col, Block, Grid, Text, Btn, Img};
+use super::spec::TokenBuilder;
 
 pub fn row() -> Row {
     let mut n = TokenNode::new(next_id());
@@ -42,6 +43,24 @@ pub fn text(content: impl Into<Str>) -> Text {
     n.content = Some(content.into());
     Text(n)
 }
+pub fn txt(content: impl Into<Str>) -> Text { text(content) }
+
+pub fn bold(content: impl Into<Str>) -> Text { text(content).bold() }
+pub fn muted(content: impl Into<Str>) -> Text { text(content).muted() }
+pub fn uppercase(content: impl Into<Str>) -> Text { text(content).uppercase() }
+pub fn center(content: impl Into<Str>) -> Text { text(content).center() }
+pub fn h1(content: impl Into<Str>) -> Text { text(content).h1() }
+pub fn h2(content: impl Into<Str>) -> Text { text(content).h2() }
+pub fn h3(content: impl Into<Str>) -> Text { text(content).h3() }
+pub fn caption(content: impl Into<Str>) -> Text { text(content).caption() }
+pub fn label(content: impl Into<Str>) -> Text { text(content).label() }
+pub fn mono(content: impl Into<Str>) -> Text { text(content).mono() }
+pub fn italic(content: impl Into<Str>) -> Text { text(content).italic() }
+pub fn strike(content: impl Into<Str>) -> Text { text(content).strike() }
+pub fn underline(content: impl Into<Str>) -> Text { text(content).underline() }
+pub fn color(content: impl Into<Str>, hex: &'static str) -> Text { text(content).color(hex) }
+pub fn loading(content: impl Into<Str>) -> Btn { btn(content).loading(true) }
+pub fn disabled(content: impl Into<Str>) -> Btn { btn(content).disabled(true) }
 
 /// Create text with dynamic/reactive content using a Leptos signal
 pub fn text_dynamic<F>(f: F) -> Text
@@ -61,6 +80,7 @@ pub fn btn(label: impl Into<Str>) -> Btn {
     let mut n = TokenNode::new(next_id()); 
     n.tag = "button".into();
     n.content = Some(label.into());
+    n.class = "inline-flex items-center justify-center gap-1 rounded font-medium transition-colors whitespace-nowrap".into();
     n.style.extra = "cursor:pointer;user-select:none;".into(); 
     Btn(n)
 }
@@ -153,6 +173,7 @@ pub fn counter_text(id: impl Into<String>, prefix: &str) -> Text {
 
 // ── Storage read/write factories ──────────────────────────────────────────────
 
+pub fn txtbnd(key: impl Into<String>) -> Text { text_bind(key.into()) }
 pub fn text_bind(key: impl Into<String>) -> Text {
     use leptos::prelude::*;
     use crate::tokens::reactive::TokenCtx;

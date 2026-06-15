@@ -1,57 +1,122 @@
 pub fn page_token() -> impl IntoToken {
-    let user = &crate::data::app_data::seed_users()[0];
+    use crate::data::app_data::seed_instagram_storage;
+    use crate::tokens::storage::primitive::Store;
+    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
     col()
-        .id("instagram_edit_page")
-        .css("min-h-screen bg-black text-white pb-20")
-        // Header
+        id("instagram_edit_page")
+        css("min-h-screen bg-black text-white pb-24 max-w-lg mx-auto")
+
         row()
-            .css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
-            btn("← Back").variant("ghost").size_str("sm").on_click_nav("instagram")
-            text("Edit Profile").css("text-lg font-bold")
-            block().css("w-12")
-        .end()
-        col().css("px-4 py-6 gap-6")
-            // Avatar preview
-            col().css("items-center gap-2")
-                img_block(user.avatar_url.as_str())
-                    .css("w-24 h-24 rounded-full border-2 border-white")
-                btn("Change Photo").variant("ghost").size_str("sm").css("text-blue-400")
-            .end()
-            // Name
-            col().css("gap-1")
-                text("Name").css("text-sm text-gray-400")
-                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
-                    .act(in_("ig_name_input"))
-            .end()
-            // Username
-            col().css("gap-1")
-                text("Username").css("text-sm text-gray-400")
-                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3")
-                    .act(in_("ig_handle_input"))
-            .end()
-            // Bio
-            col().css("gap-1")
-                text("Bio").css("text-sm text-gray-400")
-                block().css("bg-gray-900 border border-gray-700 rounded-lg p-3 min-h-[80px]")
-                    .act(in_("ig_bio_input"))
-            .end()
-            // Save button
-            btn("Save").variant("primary").size_str("md").css("w-full rounded-lg")
-                .act(chain(vec![
-                    store_from_val("ig_name", "ig_name_input"),
-                    store_from_val("ig_handle", "ig_handle_input"),
-                    store_from_val("ig_bio", "ig_bio_input"),
+            css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
+            btn("← Back")
+                var("ghost")
+                sz("sm")
+                on_click_nav("instagram")
+            txt("Edit Profile")
+                css("text-lg font-bold")
+            btn("Save")
+                var("ghost")
+                sz("sm")
+                css("text-blue-400 font-semibold")
+                act(chain(vec![
+                    store_set_input("ig.me.name",   "ig.edit.name"),
+                    store_set_input("ig.me.handle", "ig.edit.handle"),
+                    store_set_input("ig.me.bio",    "ig.edit.bio"),
+                    store_set_input("ig.me.avatar", "ig.edit.avatar"),
                     navigate("instagram"),
                 ]))
-        .end()
-        // Bottom nav
+
+        col()
+            css("px-4 pt-6 pb-8 gap-6")
+            col()
+                css("items-center gap-3")
+                block()
+                    css("w-24 h-24 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600")
+                    img_block("https://i.pravatar.cc/150?u=me")
+                        css("w-full h-full rounded-full border-2 border-black object-cover")
+                txt("Change profile photo")
+                    css("text-sm font-medium text-blue-400 cursor-pointer")
+
+            col()
+                css("gap-1")
+                txt("Name")
+                    css("text-xs font-medium text-gray-400 uppercase tracking-wide")
+                txtinp("Your name", "ig.edit.name")
+                    css("w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500")
+
+            col()
+                css("gap-1")
+                txt("Username")
+                    css("text-xs font-medium text-gray-400 uppercase tracking-wide")
+                txtinp("@handle", "ig.edit.handle")
+                    css("w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500")
+
+            col()
+                css("gap-1")
+                txt("Bio")
+                    css("text-xs font-medium text-gray-400 uppercase tracking-wide")
+                txtinp("Write a bio...", "ig.edit.bio")
+                    css("w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-100 focus:outline-none focus:border-blue-500 min-h-[80px]")
+
+            col()
+                css("gap-1")
+                txt("Avatar URL")
+                    css("text-xs font-medium text-gray-400 uppercase tracking-wide")
+                txtinp("https://i.pravatar.cc/150?u=me", "ig.edit.avatar")
+                    css("w-full bg-gray-900 border border-gray-700 rounded-lg px-3 py-2.5 text-sm text-gray-400 focus:outline-none focus:border-blue-500 break-all")
+
+            block()
+                css("border-t border-gray-800 pt-2")
+                row()
+                    css("py-3 items-center justify-between")
+                    txt("Switch to Professional account")
+                        css("text-sm text-gray-300")
+                    txt("›")
+                        css("text-gray-500")
+                row()
+                    css("py-3 items-center justify-between border-t border-gray-800")
+                    txt("Personal information settings")
+                        css("text-sm text-gray-300")
+                    txt("›")
+                        css("text-gray-500")
+
+            btn("Save changes")
+                var("primary")
+                sz("md")
+                css("w-full rounded-xl py-3 text-base font-semibold")
+                act(chain(vec![
+                    store_set_input("ig.me.name",   "ig.edit.name"),
+                    store_set_input("ig.me.handle", "ig.edit.handle"),
+                    store_set_input("ig.me.bio",    "ig.edit.bio"),
+                    store_set_input("ig.me.avatar", "ig.edit.avatar"),
+                    navigate("instagram"),
+                ]))
+
         row()
-            .css("fixed bottom-0 left-0 right-0 bg-black border-t border-gray-800 py-3 px-6 justify-between z-50")
-            btn("🏠").variant("ghost").on_click_nav("instagram").css("text-xl")
-            btn("🔍").variant("ghost").css("text-xl")
-            btn("➕").variant("ghost").on_click_nav("instagram_create").css("text-xl")
-            btn("♡").variant("ghost").css("text-xl")
-            img_block(user.avatar_url.as_str()).css("w-6 h-6 rounded-full")
-        .end()
+            css("fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto")
+            btn("🏠")
+                var("ghost")
+                css("text-2xl opacity-60")
+                on_click_nav("instagram_home")
+            btn("🔍")
+                var("ghost")
+                css("text-2xl opacity-60")
+                on_click_nav("instagram_explore")
+            btn("➕")
+                var("ghost")
+                css("text-2xl opacity-60")
+                on_click_nav("instagram_create")
+            btn("🎬")
+                var("ghost")
+                css("text-2xl opacity-60")
+                on_click_nav("instagram_reels")
+            btn("♡")
+                var("ghost")
+                css("text-2xl opacity-60")
+                on_click_nav("instagram_notifications")
+            btn("👤")
+                var("ghost")
+                css("text-2xl")
+                on_click_nav("instagram")
 }

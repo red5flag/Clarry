@@ -1,0 +1,72 @@
+pub fn page_token() -> impl IntoToken {
+    use crate::data::app_data::seed_instagram_storage;
+    use crate::tokens::storage::primitive::Store;
+    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+
+    col()
+        id("instagram_story_page")
+        css("min-h-screen bg-black relative overflow-hidden select-none max-w-lg mx-auto")
+
+        block()
+            css("absolute inset-0 z-0")
+            img_block("https://picsum.photos/600/900?random=42")
+                css("w-full h-full object-cover")
+
+        block()
+            css("absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-black/70 to-transparent z-10 pointer-events-none")
+
+        row()
+            css("absolute top-0 left-0 right-0 z-20 px-3 pt-3 gap-1.5 items-center")
+            block()
+                css("h-0.5 flex-1 bg-white rounded-full")
+            block()
+                css("h-0.5 flex-1 bg-white/70 rounded-full relative overflow-hidden")
+                block()
+                    css("absolute inset-y-0 left-0 bg-white rounded-full w-1/2")
+            block()
+                css("h-0.5 flex-1 bg-white/30 rounded-full")
+
+        row()
+            css("absolute top-8 left-0 right-0 z-20 px-4 py-2 gap-3 items-center")
+            block()
+                css("w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0")
+                img_block("https://i.pravatar.cc/150?u=bob")
+                    css("w-full h-full rounded-full border-2 border-black object-cover")
+            col()
+                css("flex-1 gap-0")
+                txtbnd("ig.viewing.story_id")
+                    css("text-sm font-semibold text-white drop-shadow")
+                txt("Now")
+                    css("text-xs text-white/70")
+            btn("✕")
+                var("ghost")
+                css("text-white text-xl")
+                act(chain(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_home")]))
+
+        row()
+            css("absolute inset-0 z-30")
+            block()
+                css("w-1/3 h-full cursor-pointer")
+                act(chain(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_story")]))
+            block()
+                css("w-2/3 h-full cursor-pointer")
+                act(chain(vec![store_set("ig.story.slide_index", "1"), navigate("instagram_story")]))
+
+        block()
+            css("absolute bottom-24 left-0 right-0 z-20 px-6 pointer-events-none")
+            txt("Living my best life ✨")
+                css("text-white text-base font-medium drop-shadow-lg text-center")
+
+        row()
+            css("absolute bottom-0 left-0 right-0 z-20 px-4 pb-6 pt-2 gap-3 items-center bg-gradient-to-t from-black/70 to-transparent")
+            block()
+                css("flex-1 bg-white/10 rounded-full border border-white/30 px-4 py-2.5")
+                txt("Send message")
+                    css("text-sm text-white/60")
+            btn("❤")
+                var("ghost")
+                css("text-2xl text-white")
+            btn("✈")
+                var("ghost")
+                css("text-2xl text-white")
+}

@@ -9,6 +9,11 @@ use super::types::Container;
 /// Common input reset style to avoid duplication.
 const INPUT_RESET: &str = "border:none;outline:none;background:transparent;width:100%;font-size:0.9rem;";
 
+pub fn txtinp(placeholder: impl Into<Str>, id: impl Into<Str>) -> Container { text_input(placeholder, id) }
+pub fn innum(id: impl Into<Str>) -> Container { input_number(id) }
+pub fn inpsw(id: impl Into<Str>) -> Container { input_password(id) }
+pub fn txtarea(id: impl Into<Str>, rows: u8) -> Container { textarea(id, rows) }
+
 /// Text input field
 pub fn text_input(placeholder: impl Into<Str>, id: impl Into<Str>) -> Container {
     let mut n = TokenNode::new(id);

@@ -60,6 +60,7 @@ impl Container {
         let mut n = TokenNode::new(next_id());
         n.tag = "button".into();
         n.content = Some(content.into());
+        n.class = "inline-flex items-center justify-center gap-1 rounded font-medium transition-colors whitespace-nowrap".into();
         n.style.extra = "cursor:pointer;user-select:none;".into();
         let mut parent = self;
         parent.node_mut().children.push(n);
@@ -170,19 +171,51 @@ impl Container {
         parent.node_mut().children.push(n);
         parent
     }
+    pub fn section(self, t: impl Into<crate::tokens::node::Str>) -> Self {
+        self.section_title(t)
+    }
 
     pub fn drawer(self, id: impl Into<crate::tokens::node::Str>, side: impl Into<crate::tokens::node::Str>, content: impl Into<crate::tokens::node::Str>) -> Self {
+        use crate::tokens::core::id::next_id;
+        use crate::tokens::action::TokenAction;
+        let id_str: crate::tokens::node::Str = id.into();
         let side = side.into().to_string();
-        let mut n = TokenNode::new(id);
+        let mut n = TokenNode::new(id_str.clone());
         n.tag = "div".into();
-        n.content = Some(content.into());
-        n.class = "fixed z-50 bg-white shadow-lg p-4".into();
+        n.class = "fixed z-50 bg-white shadow-lg flex flex-col".into();
         let (position, size) = match side.as_str() {
-            "left" => ("left:0;top:0;bottom:0;", "width:16rem;"),
-            "right" => ("right:0;top:0;bottom:0;", "width:16rem;"),
-            _ => ("top:0;left:0;right:0;", "height:16rem;"),
+            "left"   => ("left:0;top:0;bottom:0;", "width:20rem;"),
+            "right"  => ("right:0;top:0;bottom:0;", "width:20rem;"),
+            "bottom" => ("bottom:0;left:0;right:0;", "height:20rem;"),
+            _        => ("top:0;left:0;right:0;", "height:20rem;"),
         };
-        n.style.extra = format!("{}{}", position, size).into();
+        n.style.extra = format!("{}{}{}", position, size, "display:none;").into();
+
+        // Header row: title + close button
+        let mut header = TokenNode::new(next_id());
+        header.layout = crate::tokens::node::Layout::Row;
+        header.class = "flex items-center justify-between px-4 py-3 border-b border-gray-200 flex-shrink-0".into();
+
+        let mut title = TokenNode::new(next_id());
+        title.content = Some(content.into());
+        title.class = "font-semibold text-gray-800 text-sm".into();
+        header.children.push(title);
+
+        let mut close_btn = TokenNode::new(next_id());
+        close_btn.tag = "button".into();
+        close_btn.content = Some("✕".into());
+        close_btn.class = "text-gray-400 hover:text-gray-700 text-lg leading-none p-1 rounded hover:bg-gray-100 transition-colors".into();
+        close_btn.actions.push(TokenAction::Hide(id_str));
+        header.children.push(close_btn);
+
+        n.children.push(header);
+
+        // Content area
+        let mut body = TokenNode::new(next_id());
+        body.layout = crate::tokens::node::Layout::Col;
+        body.class = "flex-1 overflow-y-auto p-4".into();
+        n.children.push(body);
+
         let mut parent = self;
         parent.stack.push(n);
         parent

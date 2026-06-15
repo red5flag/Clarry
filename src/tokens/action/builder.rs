@@ -79,10 +79,12 @@ pub fn set_attr(target: impl Into<Str>, attr: impl Into<Str>, value: impl Into<S
 pub fn navigate(page: impl Into<Str>) -> TokenAction {
     TokenAction::Navigate(page.into())
 }
+pub fn nav(page: impl Into<Str>) -> TokenAction { navigate(page) }
 
 pub fn open_url(url: impl Into<Str>) -> TokenAction {
     TokenAction::Custom(format!("open_url:{}", url.into()).into())
 }
+pub fn url(u: impl Into<Str>) -> TokenAction { open_url(u) }
 
 pub fn open_url_new_tab(url: impl Into<Str>) -> TokenAction {
     TokenAction::Custom(format!("open_url_new:{}", url.into()).into())
@@ -172,6 +174,24 @@ pub fn store_delete(key: impl Into<Str>) -> TokenAction {
     }
 }
 
+/// Append the current value of `input_key` (from input state) as a new item
+/// into the JSON array stored at `key`. Creates the array if absent.
+pub fn store_push(key: impl Into<Str>, input_key: impl Into<Str>) -> TokenAction {
+    TokenAction::StorePush { key: key.into(), input_key: input_key.into() }
+}
+
+/// Remove all items from the JSON array at `key` that match the current value
+/// of `input_key` (from input state).
+pub fn store_remove(key: impl Into<Str>, input_key: impl Into<Str>) -> TokenAction {
+    TokenAction::StoreRemove { key: key.into(), input_key: input_key.into() }
+}
+
+/// Write to a dynamic storage path: both the path and value come from input fields
+/// identified by `path_input` and `val_input` element IDs.
+pub fn store_write_to_path(path_input: impl Into<Str>, val_input: impl Into<Str>) -> TokenAction {
+    TokenAction::StoreWriteToPath { path_input: path_input.into(), val_input: val_input.into() }
+}
+
 // ── State actions ──────────────────────────────────────────────────────────────
 
 pub fn toggle_state(key: impl Into<Str>) -> TokenAction {
@@ -181,17 +201,20 @@ pub fn toggle_state(key: impl Into<Str>) -> TokenAction {
         off_state: "false".into(),
     }
 }
+pub fn tog(key: impl Into<Str>) -> TokenAction { toggle_state(key) }
 
 pub fn cycle_state(key: impl Into<Str>, values: Vec<impl Into<Str>>) -> TokenAction {
     let key = key.into();
     let values_str = values.into_iter().map(|v| v.into().to_string()).collect::<Vec<_>>().join(",");
     TokenAction::Custom(format!("cycle:{}:{}", key, values_str).into())
 }
+pub fn cyc(key: impl Into<Str>, values: Vec<impl Into<Str>>) -> TokenAction { cycle_state(key, values) }
 
 /// Increment a counter by 1 (default)
 pub fn increment(key: impl Into<Str>) -> TokenAction {
     TokenAction::Increment { key: key.into(), by: 1 }
 }
+pub fn inc(key: impl Into<Str>) -> TokenAction { increment(key) }
 
 /// Increment a counter by a specific amount
 pub fn increment_by(key: impl Into<Str>, amount: i32) -> TokenAction {
@@ -202,6 +225,7 @@ pub fn increment_by(key: impl Into<Str>, amount: i32) -> TokenAction {
 pub fn decrement(key: impl Into<Str>) -> TokenAction {
     TokenAction::Decrement { key: key.into(), by: 1 }
 }
+pub fn dec(key: impl Into<Str>) -> TokenAction { decrement(key) }
 
 /// Decrement a counter by a specific amount
 pub fn decrement_by(key: impl Into<Str>, amount: i32) -> TokenAction {

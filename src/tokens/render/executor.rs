@@ -16,6 +16,8 @@ use super::dom;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
+use wasm_bindgen::closure::Closure;
+#[cfg(target_arch = "wasm32")]
 use js_sys;
 
 #[allow(unused_variables)]
@@ -113,23 +115,39 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                 #[cfg(target_arch = "wasm32")]
                 {
                     let endpoint = endpoint.to_string();
-                    let key = key.to_string();
+                    let key_str = key.to_string();
+                    let strings_signal = ctx.strings;
+                    let list_rev_signal = ctx.list_rev;
                     wasm_bindgen_futures::spawn_local(async move {
                         if let Some(window) = web_sys::window() {
                             let promise = window.fetch_with_str(&endpoint);
-                            let resp = wasm_bindgen_futures::JsFuture::from(promise).await;
-                            if let Ok(resp) = resp {
-                                if let Ok(response) = resp.dyn_into::<web_sys::Response>() {
-                                    if let Ok(text_promise) = response.text() {
-                                        let text = wasm_bindgen_futures::JsFuture::from(text_promise).await;
-                                        if let Ok(text) = text {
-                                            if let Some(text_str) = text.as_string() {
-                                                leptos::logging::log!("[TOKEN_ACTION] Preload success: {}", text_str);
-                                                Store::write(&key, &text_str);
+                            match wasm_bindgen_futures::JsFuture::from(promise).await {
+                                Ok(resp) => {
+                                    if let Ok(response) = resp.dyn_into::<web_sys::Response>() {
+                                        if response.ok() {
+                                            if let Ok(text_promise) = response.text() {
+                                                match wasm_bindgen_futures::JsFuture::from(text_promise).await {
+                                                    Ok(text) => {
+                                                        if let Some(text_str) = text.as_string() {
+                                                            leptos::logging::log!("[TOKEN_ACTION] Preload success key={} len={}", key_str, text_str.len());
+                                                            Store::write(&key_str, &text_str);
+                                                            strings_signal.update(|m| { m.insert(key_str.clone(), text_str); });
+                                                            list_rev_signal.update(|n| *n += 1);
+                                                        }
+                                                    }
+                                                    Err(e) => leptos::logging::log!("[TOKEN_ACTION] Preload text() failed: {:?}", e),
+                                                }
                                             }
+                                        } else {
+                                            let status = response.status();
+                                            leptos::logging::log!("[TOKEN_ACTION] Preload HTTP error: {}", status);
+                                            let msg = format!("HTTP {}", status);
+                                            strings_signal.update(|m| { m.insert(key_str.clone(), msg); });
+                                            list_rev_signal.update(|n| *n += 1);
                                         }
                                     }
                                 }
+                                Err(e) => leptos::logging::log!("[TOKEN_ACTION] Preload fetch failed: {:?}", e),
                             }
                         }
                     });
@@ -158,7 +176,10 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             }
             TokenAction::StoreDelete { key } => {
                 leptos::logging::log!("[TOKEN_ACTION] StoreDelete - key: {}", key);
-                Store::delete_root(key);
+                // Write empty string to the specific key, not delete_root which would
+                // wipe all sibling keys sharing the same root (e.g. demo.note would
+                // destroy demo.items, demo.tags etc.)
+                Store::write(key, "");
                 ctx.set_string(key, "");
                 ctx.bump_list_rev();
             }
@@ -306,6 +327,92 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                 leptos::logging::log!("[TOKEN_ACTION] Submit - form: {}, submit: {:?}, invalid: {:?}", form_id, on_submit, on_invalid);
                 ActionRegistry::global().execute(&format!("submit:{}", form_id));
             }
+            TokenAction::StorePush { key, input_key } => {
+                leptos::logging::log!("[TOKEN_ACTION] StorePush - key: {}, input_key: {}", key, input_key);
+                let input_val = ctx.strings.get().get(input_key.as_ref()).cloned()
+                    .or_else(|| Store::read(input_key));
+                if let Some(val) = input_val.filter(|v| !v.is_empty()) {
+                    // Read array from ctx.strings first (most up-to-date), then Store
+                    let arr_json = ctx.strings.get().get(key.as_ref()).cloned()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| Store::read(key))
+                        .unwrap_or_else(|| "[]".to_string());
+                    let mut arr: Vec<serde_json::Value> = serde_json::from_str(&arr_json).unwrap_or_default();
+                    // Always push — duplicates allowed
+                    arr.push(serde_json::json!({"text": val}));
+                    let new_json = serde_json::to_string(&arr).unwrap_or_default();
+                    Store::write(key, &new_json);
+                    ctx.set_string(key, new_json);
+                    ctx.bump_list_rev();
+                    // Clear the input signal AND the DOM element value
+                    ctx.set_string(input_key, "".to_string());
+                    #[cfg(target_arch = "wasm32")]
+                    if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                        if let Some(el) = doc.get_element_by_id(input_key.as_ref()) {
+                            if let Ok(inp) = el.dyn_into::<web_sys::HtmlInputElement>() {
+                                let _ = inp.set_value("");
+                            }
+                        }
+                    }
+                }
+            }
+            TokenAction::StoreRemove { key, input_key } => {
+                leptos::logging::log!("[TOKEN_ACTION] StoreRemove - key: {}, input_key: {}", key, input_key);
+                let input_val = ctx.strings.get().get(input_key.as_ref()).cloned()
+                    .or_else(|| Store::read(input_key));
+                if let Some(val) = input_val.filter(|v| !v.is_empty()) {
+                    // Read array from ctx.strings first (most up-to-date), then Store
+                    let arr_json = ctx.strings.get().get(key.as_ref()).cloned()
+                        .filter(|s| !s.is_empty())
+                        .or_else(|| Store::read(key))
+                        .unwrap_or_else(|| "[]".to_string());
+                    let mut arr: Vec<serde_json::Value> = serde_json::from_str(&arr_json).unwrap_or_default();
+                    // Remove only the FIRST matching item (not all duplicates)
+                    let mut removed = false;
+                    arr.retain(|item| {
+                        if !removed && item.get("text").and_then(|v| v.as_str()) == Some(&val) {
+                            removed = true;
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                    let new_json = serde_json::to_string(&arr).unwrap_or_default();
+                    Store::write(key, &new_json);
+                    ctx.set_string(key, new_json);
+                    ctx.bump_list_rev();
+                    // Do NOT clear the input — DOM doesn't sync from signal,
+                    // so clearing signal only causes silent failure on re-add
+                }
+            }
+            TokenAction::StoreWriteToPath { path_input, val_input } => {
+                leptos::logging::log!("[TOKEN_ACTION] StoreWriteToPath - path_input: {}, val_input: {}", path_input, val_input);
+                let strings = ctx.strings.get();
+                let path = strings.get(path_input.as_ref()).cloned()
+                    .or_else(|| Store::read(path_input))
+                    .unwrap_or_default();
+                let val = strings.get(val_input.as_ref()).cloned()
+                    .or_else(|| Store::read(val_input))
+                    .unwrap_or_default();
+                if !path.is_empty() {
+                    Store::write(&path, &val);
+                    ctx.set_string(&path, val.clone());
+                    ctx.set_string("storage.last_written", format!("{} = {}", path, val));
+                    ctx.bump_list_rev();
+                    ctx.set_string(path_input, "".to_string());
+                    ctx.set_string(val_input, "".to_string());
+                    #[cfg(target_arch = "wasm32")]
+                    if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                        for eid in [path_input.as_ref(), val_input.as_ref()] {
+                            if let Some(el) = doc.get_element_by_id(eid) {
+                                if let Ok(inp) = el.dyn_into::<web_sys::HtmlInputElement>() {
+                                    let _ = inp.set_value("");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -345,6 +452,61 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
             if let Ok(nav) = win.navigator().dyn_into::<web_sys::Navigator>() {
                 let clipboard = nav.clipboard();
                 let _ = clipboard.write_text(text);
+            }
+        }
+    } else if let Some(encoded) = name.strip_prefix("copy_with_toast:") {
+        let text = encoded.replace("\x3A", ":").replace("\x0A", "\n");
+        leptos::logging::log!("[TOKEN_ACTION] copy_with_toast -> {} chars", text.len());
+        #[cfg(target_arch = "wasm32")]
+        if let Some(win) = web_sys::window() {
+            // Copy to clipboard
+            if let Ok(nav) = win.navigator().dyn_into::<web_sys::Navigator>() {
+                let _ = nav.clipboard().write_text(&text);
+            }
+            // Spawn cursor-following "Copied!" toast via eval
+            if let Some(doc) = win.document() {
+                if let Ok(el) = doc.create_element("div") {
+                    let _ = el.set_attribute("style",
+                        "position:fixed;z-index:9999;pointer-events:none;\
+                         background:#1f2937;color:#fff;font-size:12px;font-weight:600;\
+                         padding:4px 10px;border-radius:6px;white-space:nowrap;\
+                         transform:translate(-50%,-130%);transition:opacity 0.3s;opacity:1;");
+                    let _ = el.set_text_content(Some("Copied!"));
+                    // Position at center of viewport initially; mousemove handler will update
+                    let _ = el.set_attribute("id", "_tok_copy_toast");
+                    if let Some(body) = doc.body() {
+                        let _ = body.append_child(&el);
+                        // Use setTimeout to remove after 1.5s
+                        let win2 = win.clone();
+                        let cb = wasm_bindgen::closure::Closure::once(move || {
+                            if let Some(doc2) = win2.document() {
+                                if let Some(toast) = doc2.get_element_by_id("_tok_copy_toast") {
+                                    let _ = toast.remove();
+                                }
+                            }
+                        });
+                        let _ = win.set_timeout_with_callback_and_timeout_and_arguments_0(
+                            cb.as_ref().unchecked_ref(), 1500
+                        );
+                        cb.forget();
+                    }
+                }
+                // Track mouse to follow cursor
+                let js_code = "
+                    (function() {
+                        var t = document.getElementById('_tok_copy_toast');
+                        if (!t) return;
+                        var h = function(e) {
+                            t.style.left = e.clientX + 'px';
+                            t.style.top  = e.clientY + 'px';
+                        };
+                        document.addEventListener('mousemove', h, {passive: true});
+                        setTimeout(function() {
+                            document.removeEventListener('mousemove', h);
+                        }, 1600);
+                    })();
+                ";
+                let _ = js_sys::eval(js_code);
             }
         }
     } else if let Some(key) = name.strip_prefix("toggle:") {
@@ -416,13 +578,22 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
         if parts.len() == 2 {
             let key = parts[0];
             let input_key = parts[1];
-            let val = ctx.strings.get().get(input_key).cloned().unwrap_or_default();
-            if !val.is_empty() {
-                use crate::tokens::storage::primitive::Store;
-                Store::write(key, &val);
-                ctx.set_string(key, val);
-                ctx.bump_list_rev();
-                ctx.set_string(input_key, "");
+            // Read from live ctx.strings first (set by input_handler), fallback to Store
+            let val = ctx.strings.get().get(input_key).cloned()
+                .or_else(|| Store::read(input_key))
+                .unwrap_or_default();
+            Store::write(key, &val);
+            ctx.set_string(key, val.clone());
+            ctx.bump_list_rev();
+            // Clear the input signal AND the DOM element value
+            ctx.set_string(input_key, "".to_string());
+            #[cfg(target_arch = "wasm32")]
+            if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
+                if let Some(el) = doc.get_element_by_id(input_key) {
+                    if let Ok(inp) = el.dyn_into::<web_sys::HtmlInputElement>() {
+                        let _ = inp.set_value("");
+                    }
+                }
             }
         }
     } else if let Some(id) = name.strip_prefix("toggle_drawer:") {

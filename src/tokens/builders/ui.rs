@@ -246,6 +246,7 @@ pub fn video_ambient(src: impl Into<Str>) -> Block {
     Container { stack: vec![n] }
 }
 
+pub fn audio(src: impl Into<Str>) -> Block { audio_player(src) }
 pub fn audio_player(src: impl Into<Str>) -> Block {
     let mut n = TokenNode::new(next_id());
     n.tag = "audio".into();
@@ -255,6 +256,7 @@ pub fn audio_player(src: impl Into<Str>) -> Block {
     Container { stack: vec![n] }
 }
 
+pub fn model(src: impl Into<Str>) -> Block { model_viewer(src) }
 pub fn model_viewer(src: impl Into<Str>) -> Block {
     let mut n = TokenNode::new(next_id());
     n.tag = "model-viewer".into();
@@ -435,17 +437,22 @@ pub fn spacer(rem: f32) -> Block {
 
 pub fn copy_block(text_content: impl Into<Str> + Clone) -> Block {
     let t: Str = text_content.into();
+    // Encode text for safe embedding in the custom action string (replace : with \x3A)
+    let safe = t.replace(':', "\x3A").replace('\n', "\x0A");
+    let copy_toast_action = TokenAction::Custom(
+        format!("copy_with_toast:{}", safe).into()
+    );
     block()
         .css("relative group")
         .child(
             block()
-                .css("bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg overflow-x-auto")
-                .child(text(t.clone()))
+                .css("bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg overflow-x-auto whitespace-pre")
+                .child(text(t))
         )
         .child(
             btn("Copy")
-                .css("absolute top-2 right-2 text-xs bg-gray-700 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity")
-                .act(TokenAction::CopyToClipboard(t))
+                .css("absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-all")
+                .act(copy_toast_action)
         )
 }
 
@@ -551,6 +558,7 @@ pub fn command_palette(actions: Vec<TokenAction>) -> Btn {
 
 // ── Accessibility primitives ────────────────────────────────────────────────
 
+pub fn sr(text_content: impl Into<Str>) -> Text { sr_only(text_content) }
 pub fn sr_only(text_content: impl Into<Str>) -> Text {
     text(text_content).append_css(
         "position:absolute;width:1px;height:1px;padding:0;margin:-1px;\
@@ -558,6 +566,7 @@ pub fn sr_only(text_content: impl Into<Str>) -> Text {
     )
 }
 
+pub fn live(key: impl Into<Str>, politeness: &str) -> Block { live_region(key, politeness) }
 pub fn live_region(key: impl Into<Str>, politeness: &str) -> Block {
     block()
         .attr("aria-live", politeness)
@@ -575,6 +584,14 @@ pub fn skip_link(target: impl Into<Str>) -> Block {
 
 // ── Theme provider ──────────────────────────────────────────────────────────
 
+/// Flat key-value theme: `theme("primary", "#3b82f6", "danger", "#ef4444", ..., content)`
+/// Pairs of (key, value) strings followed by a content token.
+#[macro_export]
+macro_rules! theme {
+    ($($key:expr, $val:expr),+ ; $content:expr) => {
+        theme_provider(vec![$( ($key, $val) ),+], $content)
+    };
+}
 pub fn theme_provider(vars: Vec<(&str, &str)>, content: impl IntoToken) -> Block {
     let css = vars.iter()
         .map(|(k, v)| format!("  --{}: {};", k, v))

@@ -2,46 +2,143 @@ use std::env;
 use std::fs;
 use std::path::Path;
 
-/// Automatically insert `.end()` calls into token DSL page files based on
-/// indentation.  When a method-chain line has lower indentation than the
-/// container that opened above it, we pop that container by emitting `.end()`.
-/// Lines inside `.child(...)` blocks are left untouched.
+/// Automatically transform indented token DSL into method-chain Rust.
+///
+/// Rules:
+///   - A standalone factory that is a *real container* (col/row/block/grid/…) opens an
+///     indent level.  When indentation returns to or below the opener's level, `.end()`
+///     is automatically emitted.  Explicit `.end()` is still accepted but no longer needed.
+///   - A standalone factory that is a *leaf node* (btn/text/img_block/…) at deeper indent
+///     becomes `.method()` on the current container.
+///   - Lines already starting with `.` (method chains) are passed through unchanged.
+///   - Lines inside open parentheses (multi-line Rust expressions) are passed through.
+///   - **Bare modifier keywords** are expanded to `.method(rest)` chain calls:
+///       css "classes"           →  .css("classes")
+///       act navigate("home")    →  .act(navigate("home"))
+///       id "page-id"            →  .id("page-id")
+///       variant "primary"       →  .variant("primary")
+///       size_str "sm"           →  .size_str("sm")
+///       on_click_nav "route"    →  .on_click_nav("route")
+///       bold  (no arg)          →  .bold()
+///     Modifiers are checked BEFORE close-container logic so a modifier at the same
+///     indent as its node never accidentally closes the parent.
 fn preprocess_token_dsl(content: &str) -> String {
-    let mut result = Vec::new();
-    let mut container_stack: Vec<usize> = Vec::new();
+    // ── Container lists ───────────────────────────────────────────────────
+    // Real layout containers: push indent level, emit .end() on close
+    let real_containers: &[&str] = &[
+        "col(", "row(", "block(", "grid(", "grid2(", "grid3(",
+        "stack(", "split(", "aspect(", "overlay(", "portal(",
+        "drawer(", "card(", "tooltip(",
+    ];
+
+    // Leaf-type nodes: accept modifier lines but do NOT emit .end()
+    let leaf_containers: &[&str] = &[
+        "btn(", "text(", "txt(",
+        "text_input(", "txtinp(", "input_number(", "innum(",
+        "input_password(", "inpsw(", "checkbox(", "textarea(", "txtarea(", "select(",
+        "img_block(", "video(", "video_ambient(", "audio_player(", "audio(",
+        "model_viewer(", "model(", "iframe(",
+        "badge(", "chip(", "qr_code(", "progress_bar(", "rating(",
+        "skeleton(", "skeleton_text(", "copy_block(",
+        "text_bind(", "txtbnd(", "text_read(", "counter_text(",
+        "bold(", "muted(", "uppercase(", "center(", "h1(", "h2(", "h3(",
+        "caption(", "label(", "mono(", "italic(", "strike(", "underline(", "color(",
+        "loading(", "disabled(",
+        "sr(", "sr_only(", "skip_link(", "live(", "live_region(",
+        "terminal(", "log_view(", "hex_view(", "tree_view(", "status_bar(",
+        "command_palette(", "shortcut(", "toast_container(", "chat_bubble(",
+        "chat_ui(", "divider(", "spacer(",
+        "modal(", "tabs(", "accordion(", "theme_provider(", "theme!(",
+        "pill_chip(",
+        "write_to(", "read_from(", "add_to(", "remove_from(", "clear_key(",
+        "load_from(", "storage_panel(", "list_panel(", "file_storage_panel(",
+    ];
+
+    let is_real_container   = |s: &str| real_containers.iter().any(|n| s.starts_with(n));
+    let is_leaf_container   = |s: &str| leaf_containers.iter().any(|n| s.starts_with(n));
+    let is_container_method = |s: &str| is_real_container(s) || is_leaf_container(s);
+
+    // ── Bare modifier keywords ────────────────────────────────────────────
+    // Lines of the form:   <keyword> <rest>
+    // are emitted as:      .<keyword>(<rest>)
+    // where <rest> is already a valid Rust expression (string literal, fn call, etc.)
+    //
+    // Single-token keywords (no argument):  bold  muted  italic  etc.
+    // are emitted as:  .<keyword>()
+    //
+    // The modifier line does NOT open a new indent level and does NOT push the stack.
+    let modifier_keywords: &[&'static str] = &[
+        "css", "act", "id", "variant", "size", "size_str",
+        "on_click_nav", "placeholder", "href", "src", "alt",
+        "min", "max", "step", "rows", "cols",
+        "name", "for_id",
+        "aria_label", "aria_hidden", "aria_live",
+        // Shorthand method aliases (emitted as .method(...) chain, not .child())
+        "var", "sz", "inc", "dec", "tog", "cyc", "in_",
+        "on_nav", "use_var", "append_css",
+        "anim_pulse", "section", "section_title",
+    ];
+    // Zero-arg modifier flags (just `.flag()`)
+    let modifier_flags: &[&'static str] = &[
+        "bold", "muted", "italic", "strike", "underline", "uppercase",
+        "center", "mono", "disabled", "loading",
+        "on_scroll_enter", "on_scroll_enter_scale",
+    ];
+
+    // Returns (keyword, rest_expression) if line is a bare modifier, else None.
+    // rest borrows from `s`; keyword is a &'static str from the lists above.
+    fn check_modifier<'a>(
+        s: &'a str,
+        modifier_keywords: &[&'static str],
+        modifier_flags: &[&'static str],
+    ) -> Option<(&'static str, &'a str)> {
+        for &kw in modifier_flags {
+            if s == kw || s == &format!("{}()", kw) {
+                return Some((kw, ""));
+            }
+        }
+        for &kw in modifier_keywords {
+            let prefix_len = kw.len() + 1; // "keyword "
+            if s.len() > prefix_len - 1
+                && s.starts_with(kw)
+                && s.as_bytes().get(kw.len()) == Some(&b' ')
+            {
+                let rest = s[prefix_len..].trim();
+                return Some((kw, rest));
+            }
+            // Also match old-style keyword(...) calls: css("..."), act(...), id("...")
+            // These appear at deeper indent and should become .keyword(...) chains, not .child()
+            if s.starts_with(kw) && s.as_bytes().get(kw.len()) == Some(&b'(') {
+                // Return entire call as-is; the emitter will prefix with `.`
+                return Some((kw, &s[kw.len()..]));
+            }
+        }
+        None
+    }
+
+    let mut result: Vec<String> = Vec::new();
+    // Stack of (indent_level, needs_end)
+    let mut container_stack: Vec<(usize, bool)> = Vec::new();
     let mut paren_depth: i32 = 0;
     let mut in_string = false;
     let mut string_char = '\0';
     let mut escape_next = false;
-
-    // Recognised container and leaf factory names for implicit-child DSL
-    let container_names = [
-        "col(", "row(", "block(", "grid(",
-        "grid2(", "grid3(", "skeleton(", "skeleton_text(",
-        "card(", "section_title(", "pill_chip(",
-    ];
-    let leaf_names = [
-        "text(", "btn(", "img_block(", "text_input(", "input_number(",
-        "input_password(", "checkbox(", "textarea(", "select(", "badge(",
-        "chip(", "divider(", "spacer(", "skeleton(", "skeleton_text(",
-        "copy_block(", "chat_bubble(", "qr_code(", "progress_bar(", "rating(",
-        "video(", "video_ambient(", "audio_player(", "model_viewer(", "iframe(",
-        "sr_only(", "skip_link(", "live_region(", "modal(", "tabs(", "accordion(",
-        "overlay(", "portal(", "tooltip(", "drawer(", "terminal(", "log_view(",
-        "hex_view(", "tree_view(", "status_bar(", "command_palette(", "shortcut(",
-        "theme_provider(", "chat_ui(", "toast_container(",
-        "card(", "section_title(", "pill_chip(",
-    ];
+    // When wrapping a multi-line expression in .child(...), track the depth at
+    // which the .child( was opened so we can close it when paren_depth returns.
+    let mut pending_child_close_at: i32 = -1;
+    // When a leaf is wrapped as .child(leaf_call), modifiers indented under it
+    // must be folded INTO that .child() call rather than chained on the parent.
+    // pending_leaf_indent = Some(leaf_indent) while we are inside such a leaf.
+    // Any modifier whose indent > leaf_indent is appended to the last result line
+    // (stripping its trailing `)`) instead of being pushed as a new line.
+    let mut pending_leaf_indent: Option<usize> = None;
 
     for line in content.lines() {
         let stripped = line.trim_start();
         let indent = line.len() - stripped.len();
-
-        // Skip paren tracking for pure comment lines so unbalanced parens
-        // inside comments do not corrupt multi-line .child() detection.
         let is_comment_line = stripped.starts_with("//");
 
-        // ---- paren-depth tracking (ignoring strings and comments) ----
+        // ── Paren-depth tracking ──────────────────────────────────────────
         let mut line_paren_delta = 0i32;
         let mut line_in_string = in_string;
         let mut line_string_char = string_char;
@@ -49,18 +146,10 @@ fn preprocess_token_dsl(content: &str) -> String {
 
         if !is_comment_line {
             for c in line.chars() {
-                if line_escape {
-                    line_escape = false;
-                    continue;
-                }
-                if c == '\\' {
-                    line_escape = true;
-                    continue;
-                }
+                if line_escape { line_escape = false; continue; }
+                if c == '\\' { line_escape = true; continue; }
                 if line_in_string {
-                    if c == line_string_char {
-                        line_in_string = false;
-                    }
+                    if c == line_string_char { line_in_string = false; }
                 } else if c == '"' || c == '\'' {
                     line_in_string = true;
                     line_string_char = c;
@@ -78,84 +167,158 @@ fn preprocess_token_dsl(content: &str) -> String {
         string_char = line_string_char;
         escape_next = line_escape;
 
-        // If we are inside a `.child(...)` (or any) paren block, pass through.
+        // Inside an open paren block → pass through unchanged.
+        // If we opened a .child( wrapper and paren_depth just returned to 0,
+        // append the closing ) to the last line.
         if was_inside_parens {
-            result.push(line.to_string());
+            if paren_depth == 0 && pending_child_close_at == 0 {
+                // This line closed the multi-line expression; append closing )
+                result.push(format!("{}) ", line));
+                pending_child_close_at = -1;
+            } else {
+                result.push(line.to_string());
+            }
             continue;
         }
 
-        // Skip blank / comment lines
+        // Blank or comment lines → pass through
         if stripped.is_empty() || is_comment_line {
             result.push(line.to_string());
             continue;
         }
 
-        // ── Implicit child DSL: standalone factory calls at deeper indent ─
         let is_standalone = !stripped.starts_with('.');
-        let is_container = is_standalone && container_names.iter().any(|n| stripped.starts_with(n));
-        let is_leaf = is_standalone && leaf_names.iter().any(|n| stripped.starts_with(n));
 
-        // Factories that have corresponding methods on Container (prepend `.`)
-        let has_container_method = [
-            "col(", "row(", "block(", "grid(",
-            "grid2(", "grid3(", "skeleton(", "skeleton_text(",
-            "text(", "btn(",
-            "overlay(", "portal(", "split(", "aspect(",
-            "tooltip(", "drawer(", "terminal(", "log_view(",
-            "hex_view(", "tree_view(", "status_bar(", "command_palette(", "shortcut(",
-            "modal(", "tabs(", "accordion(",
-            "card(", "section_title(", "pill_chip(",
-        ].iter().any(|n| stripped.starts_with(n));
+        // Explicit .end() → pop stack and pass through
+        if stripped == ".end()" {
+            container_stack.pop();
+            result.push(line.to_string());
+            continue;
+        }
 
-        // Emit .end() for containers that have closed due to indent decrease
-        if !container_stack.is_empty() {
-            let parent_indent = *container_stack.last().unwrap();
-            if indent <= parent_indent && !is_standalone_container(stripped) {
-                let mut ends_needed = 0;
-                while let Some(&last_indent) = container_stack.last() {
+        // ── Bare modifier keyword: css / act / id / variant / ... ─────────
+        // MUST be checked BEFORE close-container logic so that a modifier at
+        // the same indent as its parent node does not accidentally close it.
+        // Modifiers attach as method calls to the most-recently opened node.
+        // They do NOT push the stack, do NOT close any container.
+        //
+        // Special case: if pending_leaf_indent is set and this modifier is
+        // indented deeper than the leaf, fold it INTO the .child() call by
+        // appending to the last result line (stripping trailing `)` first).
+        if is_standalone {
+            if let Some((kw, rest)) = check_modifier(stripped, modifier_keywords, modifier_flags) {
+                let modifier_str = if rest.is_empty() {
+                    format!(".{}()", kw)
+                } else if rest.starts_with('(') {
+                    format!(".{}{}", kw, rest)
+                } else {
+                    format!(".{}({})", kw, rest)
+                };
+
+                if let Some(leaf_indent) = pending_leaf_indent {
+                    if indent > leaf_indent && line_paren_delta == 0 {
+                        // Fold into the pending .child(leaf...) call —
+                        // only when the modifier value is single-line (no open parens)
+                        if let Some(last) = result.last_mut() {
+                            // Strip trailing ) and space, append modifier, re-close
+                            let trimmed = last.trim_end_matches(|c: char| c == ' ');
+                            if trimmed.ends_with(')') {
+                                *last = format!("{}{})", &trimmed[..trimmed.len()-1], modifier_str);
+                            } else {
+                                last.push_str(&modifier_str);
+                            }
+                        }
+                        continue;
+                    } else if indent <= leaf_indent || line_paren_delta != 0 {
+                        // Multi-line modifier or dedented — end leaf folding window
+                        pending_leaf_indent = None;
+                    }
+                }
+
+                result.push(format!("{}{}", " ".repeat(indent), modifier_str));
+                continue;
+            }
+        }
+
+        // Any non-modifier, non-comment standalone line at or below leaf indent
+        // ends the pending-leaf modifier window.
+        if is_standalone && !stripped.starts_with("//") {
+            if let Some(leaf_indent) = pending_leaf_indent {
+                if indent <= leaf_indent {
+                    pending_leaf_indent = None;
+                }
+            }
+        }
+
+        // ── Close containers whose indent ≥ current line ─────────────────
+        if is_standalone && !container_stack.is_empty() {
+            let parent_indent = container_stack.last().unwrap().0;
+            if indent <= parent_indent {
+                while let Some(&(last_indent, needs_end)) = container_stack.last() {
                     if indent <= last_indent {
                         container_stack.pop();
-                        ends_needed += 1;
+                        if needs_end {
+                            result.push(" ".repeat(indent) + ".end()");
+                        }
                     } else {
                         break;
                     }
                 }
-                for _ in 0..ends_needed {
-                    result.push(" ".repeat(indent) + ".end()");
-                }
             }
         }
 
-        if (is_container || is_leaf) && !container_stack.is_empty() {
-            let parent_indent = *container_stack.last().unwrap();
+        // ── Transform standalone calls inside a container context ─────────
+        // Macro invocations (theme!(...), vec![...]) inside a container get wrapped
+        // in .child() — they cannot be turned into .method() calls directly.
+        let is_macro_call = {
+            let s = stripped.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
+            s.starts_with("!(") || s.starts_with("![")
+        };
+        if is_standalone && is_macro_call && !container_stack.is_empty() {
+            let parent_indent = container_stack.last().unwrap().0;
             if indent > parent_indent {
-                if is_container && has_container_method {
-                    let transformed = " ".repeat(indent) + "." + stripped;
-                    result.push(transformed);
-                    container_stack.push(indent);
-                } else if is_leaf && has_container_method {
-                    let transformed = " ".repeat(indent) + "." + stripped;
-                    result.push(transformed);
+                if line_paren_delta > 0 {
+                    result.push(format!("{}.child({}", " ".repeat(indent), stripped));
+                    pending_child_close_at = 0;
                 } else {
-                    let transformed = " ".repeat(indent) + ".child(" + stripped + ")";
-                    result.push(transformed);
+                    result.push(format!("{}.child({})", " ".repeat(indent), stripped));
+                }
+                continue;
+            }
+        }
+        if is_standalone && !is_macro_call && !container_stack.is_empty() {
+            let parent_indent = container_stack.last().unwrap().0;
+            if indent > parent_indent {
+                if is_real_container(stripped) {
+                    // Real containers: .row(), .col(), .block() etc. — method on Container, push stack
+                    result.push(" ".repeat(indent) + "." + stripped);
+                    container_stack.push((indent, true));
+                    pending_leaf_indent = None; // real container opens a new scope
+                } else if is_leaf_container(stripped) || true {
+                    // Leaf factories and other standalone calls: wrap in .child()
+                    if line_paren_delta > 0 {
+                        // Multi-line expression: open .child( without closing )
+                        // The closing ) will be appended when paren_depth returns to 0
+                        result.push(format!("{}.child({}", " ".repeat(indent), stripped));
+                        pending_child_close_at = 0;
+                        // Multi-line leaves can't use pending_leaf_indent folding
+                        pending_leaf_indent = None;
+                    } else {
+                        result.push(format!("{}.child({})", " ".repeat(indent), stripped));
+                        // Record leaf indent so subsequent modifier lines fold in
+                        pending_leaf_indent = Some(indent);
+                    }
+                } else {
+                    unreachable!()
                 }
                 continue;
             }
         }
 
-        // Unknown standalone function call at deeper indent → wrap in .child()
-        if is_standalone && !container_stack.is_empty() {
-            let parent_indent = *container_stack.last().unwrap();
-            if indent > parent_indent {
-                let transformed = " ".repeat(indent) + ".child(" + stripped + ")";
-                result.push(transformed);
-                continue;
-            }
-        }
-
-        if is_standalone_container(stripped) {
-            container_stack.push(indent);
+        // ── Top-level standalone container factory → open indent level ────
+        if is_standalone && is_container_method(stripped) {
+            let needs_end = is_real_container(stripped);
+            container_stack.push((indent, needs_end));
             result.push(line.to_string());
             continue;
         }
@@ -163,14 +326,127 @@ fn preprocess_token_dsl(content: &str) -> String {
         result.push(line.to_string());
     }
 
+    // Close any remaining open real-containers at EOF
+    while container_stack.len() > 1 {
+        let (_, needs_end) = container_stack.pop().unwrap();
+        if needs_end {
+            result.push(".end()".to_string());
+        }
+    }
+
     result.join("\n")
 }
 
-fn is_standalone_container(stripped: &str) -> bool {
-    (stripped.starts_with("col(") || stripped.starts_with("row(")
-     || stripped.starts_with("block(") || stripped.starts_with("grid("))
-    && !stripped.starts_with('.')
+/// Rewrite bare `[...]` array literals (not preceded by `vec!`) to `vec![...]`.
+/// Operates as a pure text pre-pass before DSL tokenisation.
+/// Skips `[` inside string literals, raw strings, and character literals.
+fn rewrite_vec_literals(content: &str) -> String {
+    let mut out = String::with_capacity(content.len() + 64);
+    let chars: Vec<char> = content.chars().collect();
+    let len = chars.len();
+    let mut i = 0;
+
+    while i < len {
+        let c = chars[i];
+
+        // Raw string: r#"..."# or r"..."
+        if c == 'r' && i + 1 < len && (chars[i + 1] == '"' || chars[i + 1] == '#') {
+            // Count leading #
+            let mut hashes = 0;
+            let mut j = i + 1;
+            while j < len && chars[j] == '#' { hashes += 1; j += 1; }
+            if j < len && chars[j] == '"' {
+                // Emit raw string as-is until closing "###...#
+                let closing: String = std::iter::once('"').chain(std::iter::repeat('#').take(hashes)).collect();
+                let start = i;
+                i = j + 1; // skip opening "
+                loop {
+                    if i >= len { break; }
+                    // Check for closing sequence
+                    let remaining: String = chars[i..].iter().collect();
+                    if remaining.starts_with(&closing) {
+                        i += closing.len();
+                        break;
+                    }
+                    i += 1;
+                }
+                let raw_str: String = chars[start..i].iter().collect();
+                out.push_str(&raw_str);
+                continue;
+            }
+            // Not a raw string — fall through
+        }
+
+        // Regular string literal
+        if c == '"' {
+            out.push('"');
+            i += 1;
+            while i < len {
+                let sc = chars[i];
+                out.push(sc);
+                if sc == '\\' && i + 1 < len {
+                    i += 1;
+                    out.push(chars[i]);
+                } else if sc == '"' {
+                    break;
+                }
+                i += 1;
+            }
+            i += 1;
+            continue;
+        }
+
+        // Character literal
+        if c == '\'' {
+            out.push('\'');
+            i += 1;
+            while i < len {
+                let sc = chars[i];
+                out.push(sc);
+                if sc == '\\' && i + 1 < len {
+                    i += 1;
+                    out.push(chars[i]);
+                } else if sc == '\'' {
+                    break;
+                }
+                i += 1;
+            }
+            i += 1;
+            continue;
+        }
+
+        // `[` — rewrite to `vec![` unless preceded by `vec!` or `]` (index expr)
+        if c == '[' {
+            let preceded_by_vec = out.trim_end().ends_with("vec!");
+            // Also skip if it looks like an index: preceded by ident char or `]` or `)`
+            let last_non_ws = out.trim_end().chars().last();
+            let is_index = matches!(last_non_ws,
+                Some(ch) if ch == ']' || ch == ')' || ch.is_alphanumeric() || ch == '_'
+            );
+            if preceded_by_vec || is_index {
+                out.push('[');
+            } else {
+                out.push_str("vec![");
+            }
+            i += 1;
+            continue;
+        }
+
+        out.push(c);
+        i += 1;
+    }
+    out
 }
+
+/// Wrap a bare page-body (no fn signature) in `pub fn page_token() -> impl IntoToken`.
+/// If the file already contains `fn page_token`, pass through unchanged.
+fn wrap_page_fn(content: &str) -> String {
+    if content.contains("fn page_token") {
+        return content.to_string();
+    }
+    format!("pub fn page_token() -> impl IntoToken {{\n{}\n}}", content)
+}
+
 
 #[cfg(test)]
 mod tests {
@@ -183,8 +459,8 @@ mod tests {
     btn("Click")
 "#;
         let out = preprocess_token_dsl(input);
-        assert!(out.contains(".text(\"hello\")"));
-        assert!(out.contains(".btn(\"Click\")"));
+        assert!(out.contains(".child(text(\"hello\"))"));
+        assert!(out.contains(".child(btn(\"Click\"))"));
     }
 
     #[test]
@@ -196,7 +472,7 @@ mod tests {
 "#;
         let out = preprocess_token_dsl(input);
         assert!(out.contains(".row()"));
-        assert!(out.contains(".text(\"nested\")"));
+        assert!(out.contains(".child(text(\"nested\"))"));
         assert!(out.contains(".end()"));
     }
 
@@ -206,14 +482,13 @@ mod tests {
     block()
         row()
             text("deep")
-        .end()
-    .end()
 "#;
         let out = preprocess_token_dsl(input);
-        assert!(out.contains(".col()"));
+        // top-level col() stays as-is; nested ones get a dot prefix
+        assert!(out.contains("col()"));
         assert!(out.contains(".block()"));
         assert!(out.contains(".row()"));
-        assert!(out.contains(".text(\"deep\")"));
+        assert!(out.contains(".child(text(\"deep\"))"));
         let ends: Vec<_> = out.lines().filter(|l| l.trim() == ".end()").collect();
         assert_eq!(ends.len(), 2);
     }
@@ -242,24 +517,29 @@ mod tests {
 "#;
         let out = preprocess_token_dsl(input);
         assert!(out.contains(".row()"));
-        assert!(out.contains(".text(\"Hello\")"));
-        assert!(out.contains(".btn(\"Click\")"));
+        assert!(out.contains(".child(text(\"Hello\"))"));
+        assert!(out.contains(".child(btn(\"Click\"))"));
         assert!(out.contains(".end()"));
     }
 
     #[test]
     fn test_sibling_containers() {
+        // Implicit-close via indentation: no explicit .end() needed.
+        // col > row > text("a"), then block > text("b"), then EOF.
+        // Generates: .end() for row (when block seen at same indent),
+        //            .end() for block (EOF), .end() for col (EOF) = 3 total.
         let input = r#"col()
     row()
         text("a")
-    .end()
     block()
         text("b")
-    .end()
 "#;
         let out = preprocess_token_dsl(input);
         let ends: Vec<_> = out.lines().filter(|l| l.trim() == ".end()").collect();
-        assert_eq!(ends.len(), 2);
+        // row gets .end() when block() is encountered at same indent
+        // block gets .end() at EOF (len > 1 loop)
+        // col (root, len==1) does NOT get .end() — it is the return value
+        assert_eq!(ends.len(), 2, "got:\n{}", out);
     }
 
     #[test]
@@ -285,7 +565,7 @@ mod tests {
         let out = preprocess_token_dsl(input);
         assert!(out.contains("        text(\"line1\")"));
         assert!(out.contains(".bold()"));
-        assert!(out.contains(".text(\"outside\")"));
+        assert!(out.contains(".child(text(\"outside\"))"));
     }
 
     #[test]
@@ -295,7 +575,7 @@ mod tests {
         .bold()
 "#;
         let out = preprocess_token_dsl(input);
-        assert!(out.contains(".text(\"He said \\\"Hello\\\"\")"));
+        assert!(out.contains(".child(text(\"He said \\\"Hello\\\"\"))"));
     }
 
     #[test]
@@ -318,13 +598,121 @@ mod tests {
             text("Deep")
 "#;
         let out = preprocess_token_dsl(input);
-        // Verify key transformations
         assert!(out.contains(".row()"));
-        assert!(out.contains(".text(\"Hello\")"));
-        assert!(out.contains(".btn(\"Click\")"));
+        assert!(out.contains(".child(text(\"Hello\"))"));
+        assert!(out.contains(".child(btn(\"Click\"))"));
         assert!(out.contains(".col()"));
         assert!(out.contains(".block()"));
-        assert!(out.contains(".text(\"Deep\")"));
+        assert!(out.contains(".child(text(\"Deep\"))"));
+    }
+
+    // ── New bare-modifier syntax tests ────────────────────────────────────
+
+    #[test]
+    fn test_css_bare_modifier() {
+        let input = r#"col()
+    css "min-h-screen bg-black"
+    row()
+        css "gap-4 items-center"
+        text("Hello")
+            css "text-sm font-bold"
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".css(\"min-h-screen bg-black\")"));
+        assert!(out.contains(".css(\"gap-4 items-center\")"));
+        assert!(out.contains(".css(\"text-sm font-bold\")"));
+    }
+
+    #[test]
+    fn test_act_bare_modifier() {
+        let input = r#"col()
+    btn("Save")
+        act store_set("key", "val")
+    btn("Nav")
+        act navigate("home")
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".act(store_set(\"key\", \"val\"))"));
+        assert!(out.contains(".act(navigate(\"home\"))"));
+    }
+
+    #[test]
+    fn test_id_and_variant_modifiers() {
+        let input = r#"col()
+    id "my-page"
+    btn("Click")
+        variant "primary"
+        css "w-full"
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".id(\"my-page\")"));
+        assert!(out.contains(".variant(\"primary\")"));
+        assert!(out.contains(".css(\"w-full\")"));
+    }
+
+    #[test]
+    fn test_bare_flag_modifier() {
+        let input = r#"col()
+    text("Hello")
+        bold
+        italic
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".bold()"));
+        assert!(out.contains(".italic()"));
+    }
+
+    #[test]
+    fn test_modifier_does_not_push_stack() {
+        // css modifier between two sibling containers should not affect nesting
+        let input = r#"col()
+    css "gap-4"
+    row()
+        css "gap-2"
+        text("A")
+    block()
+        text("B")
+"#;
+        let out = preprocess_token_dsl(input);
+        // col gets css
+        assert!(out.contains(".css(\"gap-4\")"));
+        // row gets css
+        assert!(out.contains(".css(\"gap-2\")"));
+        // both row and block are children of col
+        assert!(out.contains(".row()"));
+        assert!(out.contains(".block()"));
+        // text A is child of row, text B is child of block
+        assert!(out.contains(".child(text(\"A\"))"));
+        assert!(out.contains(".child(text(\"B\"))"));
+        // two .end() calls for row and block
+        let ends: Vec<_> = out.lines().filter(|l| l.trim() == ".end()").collect();
+        assert_eq!(ends.len(), 2, "Expected 2 .end() calls, got: {}", out);
+    }
+
+    #[test]
+    fn test_on_click_nav_modifier() {
+        let input = r#"col()
+    btn("Home")
+        on_click_nav "instagram_home"
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".on_click_nav(\"instagram_home\")"));
+    }
+
+    #[test]
+    fn test_mixed_old_and_new_syntax() {
+        // Old .css() / .act() style should still pass through unchanged
+        let input = r#"col()
+    row()
+        .css("gap-4")
+        text("Hello")
+            css "text-sm"
+            .bold()
+"#;
+        let out = preprocess_token_dsl(input);
+        assert!(out.contains(".css(\"gap-4\")"));
+        assert!(out.contains(".css(\"text-sm\")"));
+        assert!(out.contains(".bold()"));
     }
 }
 
@@ -388,7 +776,8 @@ fn main() {
                                 
                                 for (file_str, file_path) in &rs_files {
                                     let module_name = file_str.trim_end_matches(".rs");
-                                    let content = fs::read_to_string(file_path).unwrap();
+                                    let raw = fs::read_to_string(file_path).unwrap();
+                                    let content = rewrite_vec_literals(&wrap_page_fn(&raw));
 
                                     // 1. Auto-insert .end() calls based on indentation
                                     let preprocessed = preprocess_token_dsl(&content);
@@ -460,7 +849,8 @@ fn main() {
                                 pages.push(page_name.to_string());
                                 
                                 // Read, preprocess, fix imports, and write to output directory
-                                let content = fs::read_to_string(&path).unwrap();
+                                let raw = fs::read_to_string(&path).unwrap();
+                                let content = rewrite_vec_literals(&wrap_page_fn(&raw));
 
                                 // 1. Auto-insert .end() calls based on indentation
                                 let preprocessed = preprocess_token_dsl(&content);

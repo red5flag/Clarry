@@ -196,38 +196,61 @@ impl Default for Palette {
 #[derive(Clone, Debug)]
 pub struct Media {
     pub mobile_breakpoint: u16,
+    pub tablet_breakpoint: u16,
     pub desktop_breakpoint: u16,
     pub compact: bool, // true = mobile-first, false = desktop-first
 }
 
 impl Media {
     pub fn mobile_first() -> Self {
-        Self { mobile_breakpoint: 640, desktop_breakpoint: 1024, compact: true }
+        Self { mobile_breakpoint: 640, tablet_breakpoint: 768, desktop_breakpoint: 1024, compact: true }
     }
 
     pub fn desktop_first() -> Self {
-        Self { mobile_breakpoint: 640, desktop_breakpoint: 1024, compact: false }
+        Self { mobile_breakpoint: 640, tablet_breakpoint: 768, desktop_breakpoint: 1024, compact: false }
+    }
+
+    /// Standard 3-tier: mobile ≤767, tablet 768–1023, desktop ≥1024
+    pub fn responsive() -> Self {
+        Self { mobile_breakpoint: 767, tablet_breakpoint: 768, desktop_breakpoint: 1024, compact: true }
     }
 
     fn to_css(&self) -> String {
-        if self.compact {
+        let mb = self.mobile_breakpoint;
+        let tb = self.tablet_breakpoint;
+        let db = self.desktop_breakpoint;
+        // Legacy compact/expanded classes (kept for backward compat)
+        let legacy = if self.compact {
             format!(
-                "@media (max-width: {}px) {{ .tok-compact {{ display:none !important; }} }}
-                 @media (min-width: {}px) {{ .tok-expanded {{ display:none !important; }} }}",
-                self.mobile_breakpoint, self.desktop_breakpoint
+                "@media (max-width: {mb}px) {{ .tok-compact {{ display:none !important; }} }}\n\
+                 @media (min-width: {db}px) {{ .tok-expanded {{ display:none !important; }} }}"
             )
         } else {
             format!(
-                "@media (min-width: {}px) {{ .tok-desktop {{ display:none !important; }} }}
-                 @media (max-width: {}px) {{ .tok-mobile {{ display:none !important; }} }}",
-                self.mobile_breakpoint, self.desktop_breakpoint
+                "@media (min-width: {db}px) {{ .tok-desktop-hide {{ display:none !important; }} }}\n\
+                 @media (max-width: {mb}px) {{ .tok-mobile-hide {{ display:none !important; }} }}"
             )
-        }
+        };
+        // 3-tier device visibility helpers:
+        //   tok-mobile  → visible only on mobile  (hidden on tablet+)
+        //   tok-tablet  → visible only on tablet  (hidden on mobile and desktop)
+        //   tok-desktop → visible only on desktop (hidden on mobile+tablet)
+        //   tok-mobile-tablet  → visible on mobile & tablet (hidden on desktop)
+        //   tok-tablet-desktop → visible on tablet & desktop (hidden on mobile)
+        format!(
+            "{legacy}\n\
+             @media (min-width: {tb}px) {{ .tok-mobile {{ display:none !important; }} }}\n\
+             @media (max-width: {mb}px), (min-width: {db}px) {{ .tok-tablet {{ display:none !important; }} }}\n\
+             @media (max-width: {less_db}px) {{ .tok-desktop {{ display:none !important; }} }}\n\
+             @media (min-width: {db}px) {{ .tok-mobile-tablet {{ display:none !important; }} }}\n\
+             @media (max-width: {mb}px) {{ .tok-tablet-desktop {{ display:none !important; }} }}",
+            less_db = db - 1,
+        )
     }
 }
 
 impl Default for Media {
     fn default() -> Self {
-        Self::mobile_first()
+        Self::responsive()
     }
 }

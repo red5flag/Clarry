@@ -87,16 +87,30 @@ where
 pub fn init_page_loader() {
     leptos::logging::log!("🔧 Initializing page loader...");
 
+    // Seed storage-driven data (idempotent — skips if already seeded)
+    crate::data::app_data::seed_instagram_storage();
+
     // Register built-in demo pages
     register_token_page("demo", crate::pages::demo::page_token);
-    register_token_page("instagram", crate::pages::instagram::page_token);
-    register_token_page("instagram_edit", crate::pages::instagram::edit::page_token);
-    register_token_page("instagram_create", crate::pages::instagram::create::page_token);
-    register_token_page("twitter", crate::pages::twitter::page_token);
-    register_token_page("chat", crate::pages::chat::page_token);
-    register_token_page("shop", crate::pages::shop::page_token);
-    register_token_page("dashboard", crate::pages::dashboard::page_token);
-    register_token_page("feed", crate::pages::feed::page_token);
+    register_token_page("instagram",                  crate::pages::instagram::page_token);
+    register_token_page("instagram_home",             crate::pages::instagram::home::page_token);
+    register_token_page("instagram_edit",             crate::pages::instagram::edit::page_token);
+    register_token_page("instagram_create",           crate::pages::instagram::create::page_token);
+    register_token_page("instagram_profile",          crate::pages::instagram::profile::page_token);
+    register_token_page("instagram_post",             crate::pages::instagram::post::page_token);
+    register_token_page("instagram_explore",          crate::pages::instagram::explore::page_token);
+    register_token_page("instagram_notifications",    crate::pages::instagram::notifications::page_token);
+    register_token_page("instagram_messages",         crate::pages::instagram::messages::page_token);
+    register_token_page("instagram_messages_detail",  crate::pages::instagram::messages_detail::page_token);
+    register_token_page("instagram_story",            crate::pages::instagram::story::page_token);
+    register_token_page("instagram_reels",            crate::pages::instagram::reels::page_token);
+    register_token_page("instagram_saved",            crate::pages::instagram::saved::page_token);
+    register_token_page("instagram_tagged",           crate::pages::instagram::tagged::page_token);
+    register_token_page("twitter",    crate::pages::twitter::page_token);
+    register_token_page("chat",       crate::pages::chat::page_token);
+    register_token_page("shop",       crate::pages::shop::page_token);
+    register_token_page("dashboard",  crate::pages::dashboard::page_token);
+    register_token_page("feed",       crate::pages::feed::page_token);
 
     // Register default generic actions
     register_default_actions();
