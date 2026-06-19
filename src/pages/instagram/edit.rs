@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_edit_page")
         css("min-h-screen bg-black text-white pb-24 max-w-lg mx-auto")
 
@@ -12,20 +11,20 @@ pub fn page_token() -> impl IntoToken {
             btn("← Back")
                 var("ghost")
                 sz("sm")
-                on_click_nav("instagram")
+                nav("instagram")
             txt("Edit Profile")
                 css("text-lg font-bold")
             btn("Save")
                 var("ghost")
                 sz("sm")
                 css("text-blue-400 font-semibold")
-                act(chain(vec![
+                acts(vec![
                     store_set_input("ig.me.name",   "ig.edit.name"),
                     store_set_input("ig.me.handle", "ig.edit.handle"),
                     store_set_input("ig.me.bio",    "ig.edit.bio"),
                     store_set_input("ig.me.avatar", "ig.edit.avatar"),
                     navigate("instagram"),
-                ]))
+                ])
 
         col()
             css("px-4 pt-6 pb-8 gap-6")
@@ -85,38 +84,37 @@ pub fn page_token() -> impl IntoToken {
                 var("primary")
                 sz("md")
                 css("w-full rounded-xl py-3 text-base font-semibold")
-                act(chain(vec![
+                acts(vec![
                     store_set_input("ig.me.name",   "ig.edit.name"),
                     store_set_input("ig.me.handle", "ig.edit.handle"),
                     store_set_input("ig.me.bio",    "ig.edit.bio"),
                     store_set_input("ig.me.avatar", "ig.edit.avatar"),
                     navigate("instagram"),
-                ]))
+                ])
 
         row()
             css("fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto")
             btn("🏠")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl")
-                on_click_nav("instagram")
-}
+                nav("instagram")

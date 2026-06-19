@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_messages_detail_page")
         css("min-h-screen bg-black text-white pb-20 max-w-lg mx-auto flex flex-col")
 
@@ -12,7 +11,7 @@ pub fn page_token() -> impl IntoToken {
             btn("←")
                 var("ghost")
                 css("text-xl")
-                on_click_nav("instagram_messages")
+                nav("instagram_messages")
             block()
                 css("relative")
                 block()
@@ -57,7 +56,7 @@ pub fn page_token() -> impl IntoToken {
                     var("ghost")
                     sz("sm")
                     css("border border-gray-600 rounded-lg text-sm px-4")
-                    act(chain(vec![store_set("ig.viewing.user_id", "bob"), navigate("instagram_profile")]))
+                    acts(vec![store_set("ig.viewing.user_id", "bob"), navigate("instagram_profile")])
 
         col()
             css("flex-1 px-4 py-4 gap-3 overflow-y-auto")
@@ -140,25 +139,24 @@ pub fn page_token() -> impl IntoToken {
             btn("🏠")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram")
-}
+                nav("instagram")

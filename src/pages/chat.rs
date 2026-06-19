@@ -2,10 +2,9 @@ use crate::tokens::builders::prelude::*;
 use crate::tokens::node::IntoToken;
 use crate::data::app_data::seed_messages;
 
-pub fn page_token() -> impl IntoToken {
-    let messages = seed_messages();
+let messages = seed_messages();
 
-    col()
+col()
         id("chat_page")
         css("min-h-screen bg-gray-900 text-white")
         row()
@@ -58,4 +57,3 @@ pub fn page_token() -> impl IntoToken {
                 css("text-xl text-gray-400")
             txt("➤")
                 css("text-xl text-blue-500")
-}

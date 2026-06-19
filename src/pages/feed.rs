@@ -2,10 +2,9 @@ use crate::tokens::builders::prelude::*;
 use crate::tokens::node::IntoToken;
 use crate::data::app_data::seed_feed;
 
-pub fn page_token() -> impl IntoToken {
-    let items = seed_feed();
+let items = seed_feed();
 
-    col()
+col()
         id("feed_page")
         css("min-h-screen bg-white")
         row()
@@ -46,4 +45,3 @@ pub fn page_token() -> impl IntoToken {
                 css("text-xl text-blue-600")
             txt("👤")
                 css("text-xl")
-}

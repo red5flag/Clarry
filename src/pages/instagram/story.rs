@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_story_page")
         css("min-h-screen bg-black relative overflow-hidden select-none max-w-lg mx-auto")
 
@@ -41,16 +40,16 @@ pub fn page_token() -> impl IntoToken {
             btn("✕")
                 var("ghost")
                 css("text-white text-xl")
-                act(chain(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_home")]))
+                acts(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_home")])
 
         row()
             css("absolute inset-0 z-30")
             block()
                 css("w-1/3 h-full cursor-pointer")
-                act(chain(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_story")]))
+                acts(vec![store_set("ig.story.slide_index", "0"), navigate("instagram_story")])
             block()
                 css("w-2/3 h-full cursor-pointer")
-                act(chain(vec![store_set("ig.story.slide_index", "1"), navigate("instagram_story")]))
+                acts(vec![store_set("ig.story.slide_index", "1"), navigate("instagram_story")])
 
         block()
             css("absolute bottom-24 left-0 right-0 z-20 px-6 pointer-events-none")
@@ -69,4 +68,3 @@ pub fn page_token() -> impl IntoToken {
             btn("✈")
                 var("ghost")
                 css("text-2xl text-white")
-}

@@ -186,6 +186,17 @@ pub fn store_remove(key: impl Into<Str>, input_key: impl Into<Str>) -> TokenActi
     TokenAction::StoreRemove { key: key.into(), input_key: input_key.into() }
 }
 
+/// Increment a numeric value at a dotted storage path by 1.
+/// Reads the current value, parses it as i32, writes (current + 1) back.
+pub fn store_inc(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("store_inc:{}", key.into()).into())
+}
+
+/// Toggle a boolean value at a dotted storage path.
+pub fn store_tog(key: impl Into<Str>) -> TokenAction {
+    TokenAction::Custom(format!("store_toggle:{}", key.into()).into())
+}
+
 /// Write to a dynamic storage path: both the path and value come from input fields
 /// identified by `path_input` and `val_input` element IDs.
 pub fn store_write_to_path(path_input: impl Into<Str>, val_input: impl Into<Str>) -> TokenAction {

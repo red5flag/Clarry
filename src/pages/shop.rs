@@ -4,7 +4,6 @@ use crate::data::app_data::seed_products;
 
 pub fn page_token() -> impl IntoToken {
     let products = seed_products();
-
     col()
         id("shop_page")
         css("min-h-screen bg-gray-50")
@@ -53,6 +52,7 @@ pub fn page_token() -> impl IntoToken {
                 css("text-xl text-blue-600")
             txt("👤")
                 css("text-xl")
+.end()
 }
 
 fn pill_chip(label: &str) -> impl IntoToken {
@@ -60,4 +60,5 @@ fn pill_chip(label: &str) -> impl IntoToken {
         css("px-4 py-1.5 bg-gray-900 text-white rounded-full text-sm whitespace-nowrap")
         txt(label)
             css("text-sm")
+    .end()
 }

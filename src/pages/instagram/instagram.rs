@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_page")
         css("min-h-screen bg-black text-white pb-20 max-w-lg mx-auto")
 
@@ -16,7 +15,7 @@ pub fn page_token() -> impl IntoToken {
                 btn("✉")
                     var("ghost")
                     css("text-xl")
-                    on_click_nav("instagram_messages")
+                    nav("instagram_messages")
                 btn("☰")
                     var("ghost")
                     css("text-xl")
@@ -58,12 +57,12 @@ pub fn page_token() -> impl IntoToken {
                             var("ghost")
                             sz("sm")
                             css("flex-1 border border-gray-600 rounded-lg text-sm font-medium")
-                            on_click_nav("instagram_edit")
+                            nav("instagram_edit")
                         btn("+ New Post")
                             var("ghost")
                             sz("sm")
                             css("flex-1 border border-gray-600 rounded-lg text-sm font-medium")
-                            on_click_nav("instagram_create")
+                            nav("instagram_create")
             col()
                 css("gap-0.5")
                 txtbnd("ig.me.name")
@@ -81,12 +80,12 @@ pub fn page_token() -> impl IntoToken {
                     css("text-lg")
             block()
                 css("flex-1 flex flex-col items-center py-2 border-b-2 border-transparent cursor-pointer")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
                 txt("🎬")
                     css("text-lg text-gray-600 opacity-60")
             block()
                 css("flex-1 flex flex-col items-center py-2 border-b-2 border-transparent cursor-pointer")
-                on_click_nav("instagram_tagged")
+                nav("instagram_tagged")
                 txt("👤")
                     css("text-lg text-gray-600 opacity-60")
 
@@ -100,33 +99,31 @@ pub fn page_token() -> impl IntoToken {
                 var("ghost")
                 sz("sm")
                 css("text-blue-400 text-sm")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
 
         row()
             css("fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto")
             btn("🏠")
                 var("ghost")
                 css("text-2xl")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram")
-}
-
+                nav("instagram")

@@ -2,11 +2,10 @@ use crate::tokens::builders::prelude::*;
 use crate::tokens::node::IntoToken;
 use crate::data::app_data::{seed_users, seed_posts};
 
-pub fn page_token() -> impl IntoToken {
-    let user = &seed_users()[0];
-    let posts = seed_posts();
+let user = &seed_users()[0];
+let posts = seed_posts();
 
-    col()
+col()
         id("twitter_page")
         css("min-h-screen bg-black text-white")
         row()
@@ -72,4 +71,3 @@ fn tweet_card(post: &crate::data::app_data::MediaPost, _me: &crate::data::app_da
                     css("text-sm")
                 txt("📤")
                     css("text-sm")
-}

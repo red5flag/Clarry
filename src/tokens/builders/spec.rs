@@ -12,6 +12,7 @@ use crate::tokens::action::{
 use crate::tokens::animation::AnimationBuilder;
 use crate::tokens::node::{DataBinding, IntoToken, Str, StyleMode, TokenNode};
 use crate::tokens::render::render_dom;
+use super::types::register_named;
 
 // ── TokenBuilder trait ────────────────────────────────────────────────────────
 
@@ -21,6 +22,18 @@ pub trait TokenBuilder: Sized + IntoToken {
     // ── Identity ─────────────────────────────────────────────────────────
     fn id(mut self, id: impl Into<Str>) -> Self {
         self.node_mut().id = id.into(); self
+    }
+
+    /// Set the element id and also register it as a named reference for
+    /// `col_ref` / `row_ref` / `block_ref` / `grid_ref`.  Unlike `col_named`,
+    /// this does not add a visible container layout.
+    fn id_named(mut self, id: impl Into<Str>) -> Self {
+        let id_str = id.into().to_string();
+        self.node_mut().id = id_str.clone().into();
+        self.node_mut().attributes.insert("data-name".into(), id_str.clone().into());
+        let node = self.node_mut().clone();
+        register_named(&id_str, &node);
+        self
     }
 
     // ── Background ───────────────────────────────────────────────────────
@@ -165,20 +178,10 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Raw CSS / Tailwind Classes ────────────────────────────────────────
-    // Always targets SELF. Use .child_css() to style the last-added child.
     fn css(mut self, extra: impl Into<Str>) -> Self {
         let extra_str = extra.into();
         self.node_mut().class = extra_str;
         self.node_mut().style_mode = StyleMode::Class;
-        self
-    }
-    /// Style the most recently added child (for chained child styling).
-    fn child_css(mut self, extra: impl Into<Str>) -> Self {
-        let extra_str = extra.into();
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.class = extra_str;
-            last.style_mode = StyleMode::Class;
-        }
         self
     }
     fn append_css(mut self, extra: impl AsRef<str>) -> Self {
@@ -188,21 +191,6 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
     fn style_mode(mut self, mode: StyleMode) -> Self {
         self.node_mut().style_mode = mode; self
-    }
-
-    // ── Children ─────────────────────────────────────────────────────────
-    fn child(mut self, c: impl IntoToken) -> Self {
-        self.node_mut().children.push(c.into_node()); self
-    }
-    fn children<I, C>(mut self, iter: I) -> Self
-    where I: IntoIterator<Item = C>, C: IntoToken {
-        self.node_mut().children.extend(iter.into_iter().map(|c| c.into_node())); self
-    }
-    fn child_if(self, cond: bool, c: impl IntoToken) -> Self {
-        if cond { self.child(c) } else { self }
-    }
-    fn child_opt(self, c: Option<impl IntoToken>) -> Self {
-        match c { Some(c) => self.child(c), None => self }
     }
 
     // ── Interaction ───────────────────────────────────────────────────────
@@ -272,6 +260,14 @@ pub trait TokenBuilder: Sized + IntoToken {
             throttle_ms: None,
         })
     }
+    fn nav(self, page: impl Into<Str>) -> Self {
+        self.on_event(EventBinding {
+            event: EventType::Click,
+            action: TokenAction::Navigate(page.into()),
+            debounce_ms: None,
+            throttle_ms: None,
+        })
+    }
     fn on_click_store_set(self, key: impl Into<Str>, val: impl Into<Str>) -> Self {
         self.on_event(EventBinding {
             event: EventType::Click,
@@ -298,17 +294,11 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Declarative actions ───────────────────────────────────────────────
-    // Always binds to SELF. Use .child_act() to attach to the last-added child.
     fn act(mut self, action: impl Into<TokenAction>) -> Self {
         self.node_mut().actions.push(action.into()); self
     }
-    /// Attach an action to the most recently added child.
-    fn child_act(mut self, action: impl Into<TokenAction>) -> Self {
-        let action = action.into();
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.actions.push(action);
-        }
-        self
+    fn acts(mut self, actions: Vec<TokenAction>) -> Self {
+        self.node_mut().actions.push(TokenAction::Chain(actions)); self
     }
     fn tap(self, action: TokenAction) -> Self {
         self.append_css("cursor:pointer;").on_action(action)
@@ -449,15 +439,11 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn variant(mut self, v: impl Into<Str>) -> Self {
         self.node_mut().variant = Some(v.into()); self
     }
-    fn var(mut self, v: impl Into<Str>) -> Self {
-        self.node_mut().variant = Some(v.into()); self
-    }
+    fn var(self, v: impl Into<Str>) -> Self { self.variant(v) }
     fn size_str(mut self, v: impl Into<Str>) -> Self {
         self.node_mut().size = Some(v.into()); self
     }
-    fn sz(mut self, v: impl Into<Str>) -> Self {
-        self.node_mut().size = Some(v.into()); self
-    }
+    fn sz(self, v: impl Into<Str>) -> Self { self.size_str(v) }
     fn loading(mut self, v: bool) -> Self {
         self.node_mut().loading = v; self
     }
@@ -466,30 +452,14 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Data binding ──────────────────────────────────────────────────────
-    // Always binds to SELF. Use .child_bind() for the last-added child.
     fn bind(mut self, signal: impl Into<Str>, token_id: impl Into<Str>) -> Self {
         self.node_mut().data_binding = Some(DataBinding::two_way(signal, token_id));
         self
     }
-    fn child_bind(mut self, signal: impl Into<Str>, token_id: impl Into<Str>) -> Self {
-        let binding = DataBinding::two_way(signal, token_id);
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.data_binding = Some(binding);
-        }
-        self
-    }
 
     // ── Data reading / infinite scroll ──────────────────────────────────────
-    // Always reads into SELF. Use .child_read() for the last-added child.
     fn read(mut self, endpoint: impl Into<Str>) -> Self {
         self.node_mut().data_binding = Some(DataBinding::one_way(endpoint.into()));
-        self
-    }
-    fn child_read(mut self, endpoint: impl Into<Str>) -> Self {
-        let ep = endpoint.into();
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.data_binding = Some(DataBinding::one_way(ep));
-        }
         self
     }
     fn inf(self, endpoint: impl Into<Str>) -> Self {
@@ -497,16 +467,8 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── List rendering ────────────────────────────────────────────────────
-    // Always lists on SELF. Use .child_list() for the last-added child.
     fn list(mut self, key: impl Into<Str>) -> Self {
         self.node_mut().data_binding = Some(DataBinding::one_way(format!("list:{}", key.into())));
-        self
-    }
-    fn child_list(mut self, key: impl Into<Str>) -> Self {
-        let ep = format!("list:{}", key.into());
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.data_binding = Some(DataBinding::one_way(ep));
-        }
         self
     }
 
@@ -516,16 +478,8 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Chart rendering ────────────────────────────────────────────────────
-    // Always charts on SELF. Use .child_chart() for the last-added child.
     fn chart(mut self, chart_type: impl Into<Str>) -> Self {
         self.node_mut().data_binding = Some(DataBinding::one_way(format!("chart:{}", chart_type.into())));
-        self
-    }
-    fn child_chart(mut self, chart_type: impl Into<Str>) -> Self {
-        let ep = format!("chart:{}", chart_type.into());
-        if let Some(last) = self.node_mut().children.last_mut() {
-            last.data_binding = Some(DataBinding::one_way(ep));
-        }
         self
     }
 
@@ -718,9 +672,7 @@ pub trait TokenBuilder: Sized + IntoToken {
     fn h3(self) -> Self { self.append_css("font-size:1.25rem;font-weight:600;") }
     fn body_text(self) -> Self { self.append_css("font-size:1rem;") }
     fn caption(self) -> Self { self.append_css("font-size:0.75rem;color:#6b7280;") }
-    fn label(self) -> Self {
-        self.append_css("font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;")
-    }
+    fn label(self) -> Self { self.append_css("font-size:0.75rem;font-weight:500;color:#6b7280;") }
     fn mono(self) -> Self { self.append_css("font-family:monospace;") }
     fn italic(self) -> Self { self.append_css("font-style:italic;") }
     fn strike(self) -> Self { self.append_css("text-decoration:line-through;") }

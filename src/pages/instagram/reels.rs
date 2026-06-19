@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_reels")
         css("min-h-screen bg-black text-white max-w-lg mx-auto relative overflow-hidden")
 
@@ -19,7 +18,7 @@ pub fn page_token() -> impl IntoToken {
                 btn("✉")
                     var("ghost")
                     css("text-xl text-white")
-                    on_click_nav("instagram_messages")
+                    nav("instagram_messages")
 
         block()
             css("relative w-full aspect-[9/16] bg-black overflow-hidden")
@@ -67,7 +66,7 @@ pub fn page_token() -> impl IntoToken {
                     btn("💬")
                         var("ghost")
                         css("text-3xl")
-                        act(chain(vec![store_set("ig.viewing.post_id", "r_bob_1"), navigate("instagram_post")]))
+                        acts(vec![store_set("ig.viewing.post_id", "r_bob_1"), navigate("instagram_post")])
                     txt("184")
                         css("text-xs text-white")
                 col()
@@ -83,7 +82,7 @@ pub fn page_token() -> impl IntoToken {
                     css("text-3xl text-white")
                 block()
                     css("w-9 h-9 rounded-full overflow-hidden border-2 border-white cursor-pointer")
-                    act(chain(vec![store_set("ig.viewing.user_id", "bob"), navigate("instagram_profile")]))
+                    acts(vec![store_set("ig.viewing.user_id", "bob"), navigate("instagram_profile")])
                     img_block("https://i.pravatar.cc/150?u=bob")
                         css("w-full h-full object-cover")
 
@@ -133,7 +132,7 @@ pub fn page_token() -> impl IntoToken {
                     btn("💬")
                         var("ghost")
                         css("text-3xl")
-                        act(chain(vec![store_set("ig.viewing.post_id", "r_diana_1"), navigate("instagram_post")]))
+                        acts(vec![store_set("ig.viewing.post_id", "r_diana_1"), navigate("instagram_post")])
                     txt("423")
                         css("text-xs text-white")
                 col()
@@ -149,7 +148,7 @@ pub fn page_token() -> impl IntoToken {
                     css("text-3xl text-white")
                 block()
                     css("w-9 h-9 rounded-full overflow-hidden border-2 border-white cursor-pointer")
-                    act(chain(vec![store_set("ig.viewing.user_id", "diana"), navigate("instagram_profile")]))
+                    acts(vec![store_set("ig.viewing.user_id", "diana"), navigate("instagram_profile")])
                     img_block("https://i.pravatar.cc/150?u=diana")
                         css("w-full h-full object-cover")
 
@@ -158,25 +157,24 @@ pub fn page_token() -> impl IntoToken {
             btn("🏠")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram")
-}
+                nav("instagram")

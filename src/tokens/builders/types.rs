@@ -2,9 +2,28 @@
 //
 // Container and leaf element types.
 
+use std::collections::HashMap;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 use crate::tokens::node::{IntoToken, Layout, Str, TokenNode};
 use crate::tokens::core::id::next_id;
 use super::spec::TokenBuilder;
+
+// ── Named-container registry ─────────────────────────────────────────────────
+/// Maps a DSL name (e.g. "Parent") to the finalized TokenNode so it can be
+/// referenced later by `col_ref` / `row_ref` / `block_ref` / `grid_ref`.
+static NAMED_REGISTRY: Lazy<Mutex<HashMap<String, TokenNode>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+pub fn register_named(name: &str, node: &TokenNode) {
+    if let Ok(mut reg) = NAMED_REGISTRY.lock() {
+        reg.insert(name.to_string(), node.clone());
+    }
+}
+
+pub fn lookup_named(name: &str) -> Option<TokenNode> {
+    NAMED_REGISTRY.lock().ok()?.get(name).cloned()
+}
 
 // ── Container (unified builder for Col, Row, Block, Grid) ─────────────────────
 
@@ -14,10 +33,36 @@ pub struct Container {
 }
 
 impl Container {
+    /// Add a child node to the current container.
+    pub fn child(mut self, node: impl IntoToken) -> Self {
+        self.node_mut().children.push(node.into_node());
+        self
+    }
+
+    /// Add multiple child nodes from an iterator.
+    pub fn children(mut self, nodes: impl IntoIterator<Item = impl IntoToken>) -> Self {
+        for node in nodes {
+            self.node_mut().children.push(node.into_node());
+        }
+        self
+    }
+
+    /// Add an optional child node.
+    pub fn child_opt(mut self, node: Option<impl IntoToken>) -> Self {
+        if let Some(node) = node {
+            self.node_mut().children.push(node.into_node());
+        }
+        self
+    }
+
     /// Pop the current builder context, moving the finished child into its parent.
     pub fn end(mut self) -> Self {
         if self.stack.len() > 1 {
             let child = self.stack.pop().unwrap();
+            // If the finished container has a data-name, register it for reference.
+            if let Some(name) = child.attributes.get("data-name").map(|s| s.to_string()) {
+                register_named(&name, &child);
+            }
             if let Some(parent) = self.stack.last_mut() {
                 parent.children.push(child);
             }
@@ -78,7 +123,7 @@ impl Container {
     pub fn grid2(self) -> Self {
         let mut n = TokenNode::new(next_id());
         n.layout = Layout::Row;
-        n.style.extra = "display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;".into();
+        n.style.extra = "display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;".into();
         let mut parent = self;
         parent.stack.push(n);
         parent
@@ -87,7 +132,7 @@ impl Container {
     pub fn grid3(self) -> Self {
         let mut n = TokenNode::new(next_id());
         n.layout = Layout::Row;
-        n.style.extra = "display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;".into();
+        n.style.extra = "display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;".into();
         let mut parent = self;
         parent.stack.push(n);
         parent
@@ -163,6 +208,22 @@ impl Container {
         parent
     }
 
+    pub fn card_named(self, name: impl Into<crate::tokens::node::Str>, title: impl Into<crate::tokens::node::Str>) -> Self {
+        let name = name.into().to_string();
+        let mut n = TokenNode::new(next_id());
+        n.tag = "div".into();
+        n.class = "p-4 bg-white rounded-lg shadow-sm space-y-2".into();
+        n.attributes.insert("data-name".into(), name.clone().into());
+        let mut title_n = TokenNode::new(next_id());
+        title_n.content = Some(title.into());
+        title_n.class = "text-sm font-semibold text-gray-700 mb-1".into();
+        n.children.push(title_n);
+        register_named(&name, &n);
+        let mut parent = self;
+        parent.stack.push(n);
+        parent
+    }
+
     pub fn section_title(self, t: impl Into<crate::tokens::node::Str>) -> Self {
         let mut n = TokenNode::new(next_id());
         n.content = Some(t.into());
@@ -173,6 +234,18 @@ impl Container {
     }
     pub fn section(self, t: impl Into<crate::tokens::node::Str>) -> Self {
         self.section_title(t)
+    }
+
+    pub fn section_named(self, name: impl Into<crate::tokens::node::Str>, t: impl Into<crate::tokens::node::Str>) -> Self {
+        let name = name.into().to_string();
+        let mut n = TokenNode::new(next_id());
+        n.content = Some(t.into());
+        n.class = "text-xl font-bold text-gray-800 mt-6".into();
+        n.attributes.insert("data-name".into(), name.clone().into());
+        register_named(&name, &n);
+        let mut parent = self;
+        parent.node_mut().children.push(n);
+        parent
     }
 
     pub fn drawer(self, id: impl Into<crate::tokens::node::Str>, side: impl Into<crate::tokens::node::Str>, content: impl Into<crate::tokens::node::Str>) -> Self {

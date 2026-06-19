@@ -18,7 +18,7 @@ pub use crate::tokens::{
     navigate, nav, open_url, url, open_url_new_tab, route,
     trigger_upload, copy_to_clipboard,
     store_set, store_set_input, store_get, store_delete, store_set_ttl, store_from_val,
-    store_push, store_remove,
+    store_push, store_remove, store_inc, store_tog,
     toggle_state, cycle_state, increment, increment_by, decrement, decrement_by,
     tog, cyc, inc, dec,
     submit_form, fetch_get, preload, store_watch, set_theme_var,
@@ -29,7 +29,9 @@ pub use crate::tokens::{
     EASE, EASE_IN, EASE_OUT, EASE_IN_OUT, SPRING, LINEAR,
     keyframe_css, stagger, stagger_children,
     // Builders
-    row, col, block, btn, text, txt, text_dynamic, grid, grid2, grid3, img_block,
+    row, row_named, row_ref, col, col_named, col_ref, block, block_named, block_ref,
+    grid, grid_named, grid_ref, grid2, grid2_named, grid3, grid3_named, img_block,
+    btn, text, txt, text_dynamic,
     bold, muted, uppercase, center, h1, h2, h3, caption, label, mono, italic, strike, underline, color,
     loading, disabled,
     text_input, txtinp, input_number, innum, input_password, inpsw, checkbox, textarea, txtarea, select,
@@ -51,6 +53,7 @@ pub use crate::tokens::{
     TokenBuilder, ActionChain,
     store,
     counter_text, text_bind, txtbnd, text_read, chat_messages, chat_bubble_messages,
+    json_list, json_count, json_field,
     // Islands
     island, style_inject, fmt_n,
     // Reactive
@@ -60,6 +63,20 @@ pub use crate::tokens::{
     render_dom,
     // Debug
     TokenTreeInspector, TokenInspectorStyles,
+    // Structural Primitives
+    foreach, ForeachBuilder,
+    if_true, if_false, if_eq, if_exists, if_gt, if_lt,
+    ConditionalBuilder, Condition,
+    count, filter, sort, find, limit,
+    FilterBuilder, SortBuilder, FindBuilder, LimitBuilder,
+    CollectionView, FilterPredicate,
+    component, use_component, slot,
+    ComponentDefBuilder, ComponentInstanceBuilder,
+    bind, global, local, literal, computed,
+    BindingSource,
+    relation, RelationBuilder,
+    query, QueryBuilder, QueryDef, JoinDef,
+    local_scope, ScopeBuilder,
 };
 
 pub use crate::ui;

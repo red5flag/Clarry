@@ -17,11 +17,11 @@ use wasm_bindgen::JsCast;
 // ── Layout / overlay primitives ───────────────────────────────────────────
 
 pub fn grid2() -> Row {
-    row().css("display:grid;grid-template-columns:repeat(2,1fr);gap:0.75rem;")
+    row().css("display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;")
 }
 
 pub fn grid3() -> Row {
-    row().css("display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px;")
+    row().css("display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;")
 }
 
 pub fn skeleton(w: f32, h: f32) -> Block {

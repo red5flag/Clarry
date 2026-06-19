@@ -68,11 +68,13 @@ fn preprocess_token_dsl(content: &str) -> String {
     //
     // The modifier line does NOT open a new indent level and does NOT push the stack.
     let modifier_keywords: &[&'static str] = &[
-        "css", "act", "id", "variant", "size", "size_str",
-        "on_click_nav", "placeholder", "href", "src", "alt",
+        "css", "act", "acts", "id", "variant", "size", "size_str",
+        "nav", "placeholder", "href", "src", "alt",
         "min", "max", "step", "rows", "cols",
         "name", "for_id",
         "aria_label", "aria_hidden", "aria_live",
+        // Conditional branches
+        "then", "else",
         // Shorthand method aliases (emitted as .method(...) chain, not .child())
         "var", "sz", "inc", "dec", "tog", "cyc", "in_",
         "on_nav", "use_var", "append_css",
@@ -116,6 +118,84 @@ fn preprocess_token_dsl(content: &str) -> String {
         None
     }
 
+    /// Transform DSL sugar for named containers and references.
+    ///   col("Parent")   -> col_named("Parent")
+    ///   row("Parent")   -> row_named("Parent")
+    ///   block("Parent") -> block_named("Parent")
+    ///   grid("Parent", n) -> grid_named("Parent", n)
+    ///   col(:Parent)    -> col_ref("Parent")
+    fn transform_named_container_call(line: &str) -> Option<String> {
+        let trimmed = line.trim_start();
+        // Only transform standalone calls (not method chains)
+        if trimmed.starts_with('.') {
+            return None;
+        }
+        // Avoid transforming inside comments
+        if trimmed.starts_with("//") {
+            return None;
+        }
+
+        // Helper: check that `pattern` appears at the start of a call in `s`.
+        // e.g. "col(" at the start of `s`, but not inside "img_block(".
+        fn is_call_start(s: &str, pattern: &str) -> Option<usize> {
+            if let Some(start) = s.find(pattern) {
+                // char before pattern must not be identifier char
+                if start > 0 {
+                    let before = s.as_bytes()[start - 1] as char;
+                    if before.is_alphanumeric() || before == '_' {
+                        return None;
+                    }
+                }
+                return Some(start);
+            }
+            None
+        }
+
+        // :Name reference forms
+        for kind in ["col", "row", "block", "grid", "stack"] {
+            let pattern = format!(r#"{}(:"#, kind);
+            if let Some(start) = is_call_start(trimmed, &pattern) {
+                let rest = &trimmed[start + pattern.len()..];
+                if let Some(end) = rest.find(|c: char| !c.is_alphanumeric() && c != '_') {
+                    if &rest[..end] == "" {
+                        return None;
+                    }
+                    let name = &rest[..end];
+                    let before = &line[..line.len() - trimmed.len() + start];
+                    let after = &rest[end..];
+                    return Some(format!("{}{}_ref(\"{}\"){}", before, kind, name, after));
+                }
+                if !rest.is_empty() {
+                    let name = rest;
+                    let before = &line[..line.len() - trimmed.len() + start];
+                    return Some(format!("{}{}_ref(\"{}\")", before, kind, name));
+                }
+            }
+        }
+
+        // "Name" definition forms
+        for kind in ["col", "row", "block", "grid", "stack"] {
+            let pattern = format!(r#"{}(""#, kind);
+            if let Some(start) = is_call_start(trimmed, &pattern) {
+                let rest = &trimmed[start + pattern.len()..];
+                if let Some(qend) = rest.find('"') {
+                    let name = &rest[..qend];
+                    let after = &rest[qend + 1..];
+                    let after_trim = after.trim_start();
+                    let before = &line[..line.len() - trimmed.len() + start];
+                    if kind == "grid" && after_trim.starts_with(',') {
+                        // grid("Name", 3) -> grid_named("Name", 3)
+                        return Some(format!(r#"{}{}_named("{}"{}"#, before, kind, name, after_trim));
+                    }
+                    if after_trim.is_empty() || after_trim.starts_with(')') {
+                        return Some(format!(r#"{}{}_named("{}"){}"#, before, kind, name, after_trim));
+                    }
+                }
+            }
+        }
+        None
+    }
+
     let mut result: Vec<String> = Vec::new();
     // Stack of (indent_level, needs_end)
     let mut container_stack: Vec<(usize, bool)> = Vec::new();
@@ -134,6 +214,17 @@ fn preprocess_token_dsl(content: &str) -> String {
     let mut pending_leaf_indent: Option<usize> = None;
 
     for line in content.lines() {
+        let mut line = line.to_string();
+        // ── Named container DSL sugar ─────────────────────────────────────
+        // col("Parent")   -> col_named("Parent")
+        // row("Parent")   -> row_named("Parent")
+        // block("Parent") -> block_named("Parent")
+        // grid("Parent", n) -> grid_named("Parent", n)
+        // col(:Parent)    -> col_ref("Parent")
+        // id("Parent")    -> id_named("Parent")
+        if let Some(transformed) = transform_named_container_call(&line) {
+            line = transformed;
+        }
         let stripped = line.trim_start();
         let indent = line.len() - stripped.len();
         let is_comment_line = stripped.starts_with("//");
@@ -207,12 +298,13 @@ fn preprocess_token_dsl(content: &str) -> String {
         // appending to the last result line (stripping trailing `)` first).
         if is_standalone {
             if let Some((kw, rest)) = check_modifier(stripped, modifier_keywords, modifier_flags) {
+                let method_name = if kw == "else" { "else_" } else { kw };
                 let modifier_str = if rest.is_empty() {
-                    format!(".{}()", kw)
+                    format!(".{}()", method_name)
                 } else if rest.starts_with('(') {
-                    format!(".{}{}", kw, rest)
+                    format!(".{}{}", method_name, rest)
                 } else {
-                    format!(".{}({})", kw, rest)
+                    format!(".{}({})", method_name, rest)
                 };
 
                 if let Some(leaf_indent) = pending_leaf_indent {

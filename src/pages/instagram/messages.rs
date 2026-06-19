@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_messages_page")
         css("min-h-screen bg-black text-white pb-20 max-w-lg mx-auto")
 
@@ -12,7 +11,7 @@ pub fn page_token() -> impl IntoToken {
             btn("← Back")
                 var("ghost")
                 sz("sm")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             txtbnd("ig.me.name")
                 css("text-base font-semibold")
             btn("✏")
@@ -55,7 +54,7 @@ pub fn page_token() -> impl IntoToken {
 
         row()
             css("px-4 py-3 gap-3 items-center cursor-pointer active:bg-gray-900")
-            act(chain(vec![store_set("ig.viewing.dm_id", "dm_bob"), store_set("ig.viewing.user_id", "bob"), navigate("instagram_messages_detail")]))
+            acts(vec![store_set("ig.viewing.dm_id", "dm_bob"), store_set("ig.viewing.user_id", "bob"), navigate("instagram_messages_detail")])
             block()
                 css("relative flex-shrink-0")
                 block()
@@ -81,7 +80,7 @@ pub fn page_token() -> impl IntoToken {
 
         row()
             css("px-4 py-3 gap-3 items-center cursor-pointer active:bg-gray-900")
-            act(chain(vec![store_set("ig.viewing.dm_id", "dm_diana"), store_set("ig.viewing.user_id", "diana"), navigate("instagram_messages_detail")]))
+            acts(vec![store_set("ig.viewing.dm_id", "dm_diana"), store_set("ig.viewing.user_id", "diana"), navigate("instagram_messages_detail")])
             block()
                 css("relative flex-shrink-0")
                 block()
@@ -109,7 +108,7 @@ pub fn page_token() -> impl IntoToken {
 
         row()
             css("px-4 py-3 gap-3 items-center cursor-pointer active:bg-gray-900")
-            act(chain(vec![store_set("ig.viewing.dm_id", "dm_charlie"), store_set("ig.viewing.user_id", "charlie"), navigate("instagram_messages_detail")]))
+            acts(vec![store_set("ig.viewing.dm_id", "dm_charlie"), store_set("ig.viewing.user_id", "charlie"), navigate("instagram_messages_detail")])
             block()
                 css("relative flex-shrink-0")
                 block()
@@ -136,25 +135,24 @@ pub fn page_token() -> impl IntoToken {
             btn("🏠")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram")
-}
+                nav("instagram")

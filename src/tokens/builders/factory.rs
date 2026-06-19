@@ -7,7 +7,7 @@ use crate::tokens::node::{Layout, Str, TokenNode};
 use crate::tokens::core::id::next_id;
 pub use crate::tokens::core::id::reset_id_counter;
 use crate::tokens::action::{TokenAction, LogLevel, ScrollBehavior};
-use super::types::{Container, Row, Col, Block, Grid, Text, Btn, Img};
+use super::types::{Container, Row, Col, Block, Grid, Text, Btn, Img, lookup_named};
 use super::spec::TokenBuilder;
 
 pub fn row() -> Row {
@@ -15,9 +15,23 @@ pub fn row() -> Row {
     n.layout = Layout::Row;
     Container { stack: vec![n] }
 }
+pub fn row_named(name: impl Into<Str>) -> Row {
+    let name = name.into().to_string();
+    let mut n = TokenNode::new(next_id());
+    n.layout = Layout::Row;
+    n.attributes.insert("data-name".into(), name.clone().into());
+    Container { stack: vec![n] }
+}
 pub fn col() -> Col {
     let mut n = TokenNode::new(next_id());
     n.layout = Layout::Col;
+    Container { stack: vec![n] }
+}
+pub fn col_named(name: impl Into<Str>) -> Col {
+    let name = name.into().to_string();
+    let mut n = TokenNode::new(next_id());
+    n.layout = Layout::Col;
+    n.attributes.insert("data-name".into(), name.clone().into());
     Container { stack: vec![n] }
 }
 pub fn grid(cols: u8) -> Grid {
@@ -25,8 +39,27 @@ pub fn grid(cols: u8) -> Grid {
     n.layout = Layout::Grid { cols };
     Container { stack: vec![n] }
 }
+pub fn grid2_named(name: impl Into<Str>) -> Grid {
+    grid_named(name, 2)
+}
+pub fn grid3_named(name: impl Into<Str>) -> Grid {
+    grid_named(name, 3)
+}
+pub fn grid_named(name: impl Into<Str>, cols: u8) -> Grid {
+    let name = name.into().to_string();
+    let mut n = TokenNode::new(next_id());
+    n.layout = Layout::Grid { cols };
+    n.attributes.insert("data-name".into(), name.clone().into());
+    Container { stack: vec![n] }
+}
 pub fn block() -> Block {
     let n = TokenNode::new(next_id());
+    Container { stack: vec![n] }
+}
+pub fn block_named(name: impl Into<Str>) -> Block {
+    let name = name.into().to_string();
+    let mut n = TokenNode::new(next_id());
+    n.attributes.insert("data-name".into(), name.clone().into());
     Container { stack: vec![n] }
 }
 pub fn stack() -> Col {
@@ -35,6 +68,77 @@ pub fn stack() -> Col {
     n.style.extra = "display:flex;flex-direction:column;".into();
     Container { stack: vec![n] }
 }
+pub fn stack_named(name: impl Into<Str>) -> Col {
+    let name = name.into().to_string();
+    let mut n = TokenNode::new(next_id());
+    n.layout = Layout::Col;
+    n.style.extra = "display:flex;flex-direction:column;".into();
+    n.attributes.insert("data-name".into(), name.clone().into());
+    Container { stack: vec![n] }
+}
+
+// ── Reference previously named containers ───────────────────────────────────
+/// Render a copy of the named container from the registry.
+/// If the name is not found, returns an empty placeholder.
+pub fn col_ref(name: impl Into<Str>) -> Col {
+    let name = name.into().to_string();
+    if let Some(node) = lookup_named(&name) {
+        Container { stack: vec![node] }
+    } else {
+        let mut n = TokenNode::new(next_id());
+        n.layout = Layout::Col;
+        n.attributes.insert("data-name".into(), format!("ref_missing:{}", name).into());
+        Container { stack: vec![n] }
+    }
+}
+
+pub fn row_ref(name: impl Into<Str>) -> Row {
+    let name = name.into().to_string();
+    if let Some(node) = lookup_named(&name) {
+        Container { stack: vec![node] }
+    } else {
+        let mut n = TokenNode::new(next_id());
+        n.layout = Layout::Row;
+        n.attributes.insert("data-name".into(), format!("ref_missing:{}", name).into());
+        Container { stack: vec![n] }
+    }
+}
+
+pub fn block_ref(name: impl Into<Str>) -> Block {
+    let name = name.into().to_string();
+    if let Some(node) = lookup_named(&name) {
+        Container { stack: vec![node] }
+    } else {
+        let mut n = TokenNode::new(next_id());
+        n.attributes.insert("data-name".into(), format!("ref_missing:{}", name).into());
+        Container { stack: vec![n] }
+    }
+}
+
+pub fn grid_ref(name: impl Into<Str>) -> Grid {
+    let name = name.into().to_string();
+    if let Some(node) = lookup_named(&name) {
+        Container { stack: vec![node] }
+    } else {
+        let mut n = TokenNode::new(next_id());
+        n.layout = Layout::Grid { cols: 1 };
+        n.attributes.insert("data-name".into(), format!("ref_missing:{}", name).into());
+        Container { stack: vec![n] }
+    }
+}
+
+pub fn stack_ref(name: impl Into<Str>) -> Col {
+    let name = name.into().to_string();
+    if let Some(node) = lookup_named(&name) {
+        Container { stack: vec![node] }
+    } else {
+        let mut n = TokenNode::new(next_id());
+        n.layout = Layout::Col;
+        n.attributes.insert("data-name".into(), format!("ref_missing:{}", name).into());
+        Container { stack: vec![n] }
+    }
+}
+
 pub fn inf(endpoint: impl Into<Str>) -> TokenAction {
     TokenAction::Custom(format!("inf:{}", endpoint.into()).into())
 }
@@ -337,6 +441,81 @@ pub fn chat_bubble_messages(storage_root: impl Into<String>) -> Block {
         }.into_any()
     }));
     Container { stack: vec![n] }
+}
+
+/// Render a JSON array from a storage path as a `<ul>` list of `field` values.
+/// Re-renders whenever the storage path is updated.
+pub fn json_list(path: impl Into<String>, field: impl Into<String>) -> Block {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    use serde_json::Value;
+    let path = path.into();
+    let field = field.into();
+    let mut n = TokenNode::new(next_id());
+    n.tag = "ul".into();
+    n.class = "list-disc pl-5 space-y-1".into();
+    n.dynamic_content = Some(Arc::new(move || {
+        let raw = use_context::<TokenCtx>()
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                ctx.strings.get().get(&path).cloned()
+                    .or_else(|| Store::read(&path))
+                    .unwrap_or_default()
+            })
+            .unwrap_or_default();
+        let items: Vec<Value> = serde_json::from_str(&raw).unwrap_or_default();
+        let rows = items.into_iter().map(|item| {
+            let text = item.get(&field).and_then(|v| v.as_str()).unwrap_or("").to_string();
+            view! { <li class="text-sm">{text}</li> }
+        }).collect::<Vec<_>>();
+        view! { <ul class="list-disc pl-5 space-y-1">{rows}</ul> }.into_any()
+    }));
+    Container { stack: vec![n] }
+}
+
+/// Render the count of items in a JSON array at a storage path.
+pub fn json_count(path: impl Into<String>) -> Text {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    let path = path.into();
+    text_dynamic(move || {
+        use_context::<TokenCtx>()
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                let raw = ctx.strings.get().get(&path).cloned()
+                    .or_else(|| Store::read(&path))
+                    .unwrap_or_default();
+                let items: Vec<serde_json::Value> = serde_json::from_str(&raw).unwrap_or_default();
+                format!("{}", items.len())
+            })
+            .unwrap_or_else(|| "0".to_string())
+    })
+}
+
+/// Render a single field from a JSON object at a storage path.
+pub fn json_field(path: impl Into<String>, field: impl Into<String>) -> Text {
+    use leptos::prelude::*;
+    use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
+    let path = path.into();
+    let field = field.into();
+    text_dynamic(move || {
+        use_context::<TokenCtx>()
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                let raw = ctx.strings.get().get(&path).cloned()
+                    .or_else(|| Store::read(&path))
+                    .unwrap_or_default();
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(&raw) {
+                    val.get(&field).and_then(|v| v.as_str()).unwrap_or(&raw).to_string()
+                } else {
+                    raw
+                }
+            })
+            .unwrap_or_default()
+    })
 }
 
 // ── Extension trait for chaining actions fluently ───────────────────────────

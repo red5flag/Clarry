@@ -1,9 +1,8 @@
-pub fn page_token() -> impl IntoToken {
-    use crate::data::app_data::seed_instagram_storage;
-    use crate::tokens::storage::primitive::Store;
-    if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+use crate::data::app_data::seed_instagram_storage;
+use crate::tokens::storage::primitive::Store;
+if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-    col()
+col()
         id("instagram_notifications_page")
         css("min-h-screen bg-black text-white pb-20 max-w-lg mx-auto")
 
@@ -12,7 +11,7 @@ pub fn page_token() -> impl IntoToken {
             btn("← Back")
                 var("ghost")
                 sz("sm")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             txt("Activity")
                 css("text-base font-semibold")
             block()
@@ -45,7 +44,7 @@ pub fn page_token() -> impl IntoToken {
                     txt("❤️")
             col()
                 css("flex-1 gap-0 cursor-pointer min-w-0")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 row()
                     css("flex-wrap gap-1 items-baseline")
                     txt("Diana Prince")
@@ -56,7 +55,7 @@ pub fn page_token() -> impl IntoToken {
                     css("text-xs text-gray-500 mt-0.5")
             block()
                 css("w-11 h-11 flex-shrink-0 overflow-hidden rounded-sm cursor-pointer")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 img_block("https://picsum.photos/100/100?random=1")
                     css("w-full h-full object-cover block")
 
@@ -71,7 +70,7 @@ pub fn page_token() -> impl IntoToken {
                     txt("💬")
             col()
                 css("flex-1 gap-0 cursor-pointer min-w-0")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 row()
                     css("flex-wrap gap-1 items-baseline")
                     txt("Bob Smith")
@@ -82,7 +81,7 @@ pub fn page_token() -> impl IntoToken {
                     css("text-xs text-gray-500 mt-0.5")
             block()
                 css("w-11 h-11 flex-shrink-0 overflow-hidden rounded-sm cursor-pointer")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 img_block("https://picsum.photos/100/100?random=2")
                     css("w-full h-full object-cover block")
 
@@ -125,7 +124,7 @@ pub fn page_token() -> impl IntoToken {
                     txt("❤️")
             col()
                 css("flex-1 gap-0 cursor-pointer min-w-0")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 row()
                     css("flex-wrap gap-1 items-baseline")
                     txt("Charlie Day")
@@ -136,7 +135,7 @@ pub fn page_token() -> impl IntoToken {
                     css("text-xs text-gray-500 mt-0.5")
             block()
                 css("w-11 h-11 flex-shrink-0 overflow-hidden rounded-sm cursor-pointer")
-                act(chain(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")]))
+                acts(vec![store_set("ig.viewing.post_id", "p_alice_1"), navigate("instagram_post")])
                 img_block("https://picsum.photos/100/100?random=3")
                     css("w-full h-full object-cover block")
 
@@ -170,25 +169,24 @@ pub fn page_token() -> impl IntoToken {
             btn("🏠")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_home")
+                nav("instagram_home")
             btn("🔍")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_explore")
+                nav("instagram_explore")
             btn("➕")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_create")
+                nav("instagram_create")
             btn("🎬")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram_reels")
+                nav("instagram_reels")
             btn("♡")
                 var("ghost")
                 css("text-2xl")
-                on_click_nav("instagram_notifications")
+                nav("instagram_notifications")
             btn("👤")
                 var("ghost")
                 css("text-2xl opacity-60")
-                on_click_nav("instagram")
-}
+                nav("instagram")

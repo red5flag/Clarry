@@ -537,6 +537,23 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
     } else if name == "show_toast" {
         leptos::logging::log!("[TOKEN_ACTION] show_toast");
         ctx.show_toast("Toast notification");
+    } else if let Some(path) = name.strip_prefix("store_inc:") {
+        leptos::logging::log!("[TOKEN_ACTION] store_inc -> {}", path);
+        use crate::tokens::storage::primitive::Store;
+        let current = Store::read(path).unwrap_or_else(|| "0".to_string());
+        let count: i32 = current.parse().unwrap_or(0);
+        let next = (count + 1).to_string();
+        Store::write(path, &next);
+        ctx.set_string(path, next.clone());
+        ctx.bump_list_rev();
+    } else if let Some(path) = name.strip_prefix("store_toggle:") {
+        leptos::logging::log!("[TOKEN_ACTION] store_toggle -> {}", path);
+        use crate::tokens::storage::primitive::Store;
+        let current = Store::read(path).unwrap_or_else(|| "false".to_string());
+        let next = if current == "true" { "false" } else { "true" };
+        Store::write(path, next);
+        ctx.set_string(path, next.to_string());
+        ctx.bump_list_rev();
     } else if let Some(rest) = name.strip_prefix("chat_send:") {
         leptos::logging::log!("[TOKEN_ACTION] chat_send -> {}", rest);
         let parts: Vec<&str> = rest.splitn(3, ':').collect();
@@ -561,11 +578,12 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
                     sender
                 );
                 Store::write(&array_path, &msg_json);
-                // Update reactive strings so text_bind refreshes
-                if let Some(updated) = Store::read(root) {
-                    ctx.set_string(root, updated.clone());
-                    // Also update any nested binding
-                    ctx.set_string(storage_key, updated);
+                // Update reactive strings so text_bind / chat_messages refresh
+                if let Some(updated_array) = Store::read(storage_key) {
+                    ctx.set_string(storage_key, updated_array);
+                }
+                if let Some(updated_root) = Store::read(root) {
+                    ctx.set_string(root, updated_root);
                 }
                 ctx.bump_list_rev();
                 // Clear input
