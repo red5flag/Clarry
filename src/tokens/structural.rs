@@ -25,8 +25,6 @@
 use std::sync::Arc;
 use crate::tokens::node::{IntoToken, Str, TokenNode};
 use crate::tokens::core::id::next_id;
-use crate::tokens::storage::primitive::Store;
-
 // =============================================================================
 // TYPE DEFINITIONS
 // =============================================================================
@@ -562,10 +560,10 @@ impl IntoToken for CollectionView {
 ///     .param("image", "")
 ///     .slot("actions")
 ///     .body(|| col()
-///         .child(img_block(bind("image")))
-///         .child(txt(bind("title")).bold())
-///         .child(txt(bind("author")).muted())
-///         .child(slot("actions"))
+///         .add(img_block(bind("image")))
+///         .add(txt(bind("title")).bold())
+///         .add(txt(bind("author")).muted())
+///         .add(slot("actions"))
 ///     )
 /// ```
 pub fn component(name: impl Into<Str>) -> ComponentDefBuilder {
@@ -746,7 +744,7 @@ pub fn relation(from: impl Into<Str>, through: impl Into<Str>, to: impl Into<Str
         from: from.into(),
         through: through.into(),
         to: to.into(),
-        template: None,
+        _template: None,
     }
 }
 
@@ -754,12 +752,12 @@ pub struct RelationBuilder {
     from: Str,
     through: Str,
     to: Str,
-    template: Option<Arc<dyn Fn(Str) -> TokenNode + Send + Sync>>,
+    _template: Option<Arc<dyn Fn(Str) -> TokenNode + Send + Sync>>,
 }
 
 impl RelationBuilder {
     /// Define the template for rendering each related item.
-    pub fn render<F>(mut self, template: F) -> Relation
+    pub fn render<F>(self, template: F) -> Relation
     where
         F: Fn(Str) -> TokenNode + Send + Sync + 'static,
     {
@@ -906,8 +904,8 @@ impl QueryBuilder {
 ///     .set("title", global("posts.0.title"))
 ///     .set("author", global("posts.0.author"))
 ///     .render(|| col()
-///         .child(txt(bind(local("title"))))
-///         .child(txt(bind(local("author"))))
+///         .add(txt(bind(local("title"))))
+///         .add(txt(bind(local("author"))))
 ///     )
 /// ```
 pub fn local_scope(name: impl Into<Str>) -> ScopeBuilder {

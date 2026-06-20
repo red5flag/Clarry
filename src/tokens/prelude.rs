@@ -36,8 +36,8 @@ pub use crate::tokens::{
     loading, disabled,
     text_input, txtinp, input_number, innum, input_password, inpsw, checkbox, textarea, txtarea, select,
     overlay, portal, split, aspect, tooltip, drawer,
-    terminal, log_view, hex_view, tree_view, status_bar, command_palette, shortcut,
-    modal, tabs, accordion,
+    terminal, log_view, hex_view, tree_view, shortcut,
+    tab, section,
     stack, inf,
     video, video_ambient, audio_player, audio, model_viewer, model, iframe,
     chat_bubble, chat_ui, qr_code,
@@ -80,5 +80,4 @@ pub use crate::tokens::{
 };
 
 pub use crate::ui;
-pub use crate::theme;
 pub use leptos::prelude::*;

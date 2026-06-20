@@ -11,7 +11,7 @@ pub mod api;
 pub use tokens::*;
 pub use tokens::builders::store;
 
-/// Declarative UI macro — eliminates `.child()` boilerplate.
+/// Declarative UI macro — eliminates `.add()` boilerplate.
 ///
 /// Syntax: `ui!(parent => { child_expr => { grandchild... }, child_expr, ... })`
 ///
@@ -21,7 +21,7 @@ pub use tokens::builders::store;
 ///     card("Title") => {
 ///         text("Hello world")
 ///     },
-///     btn("Click").act(increment("c"))
+///     btn("Click").push_action(increment("c"))
 /// })
 /// ```
 #[macro_export]
@@ -67,7 +67,6 @@ use leptos::prelude::*;
 #[cfg(feature = "hydrate")]
 #[wasm_bindgen::prelude::wasm_bindgen]
 pub fn hydrate() {
-    use leptos::prelude::*;
     use leptos::mount::mount_to_body;
 
     // ── PROMINENT CSR START LOGGING ─────────────────────────────────────
@@ -197,6 +196,7 @@ pub fn hydrate() {
         .map(|p| p.now())
         .unwrap_or(0.0);
 
+    #[allow(unused_variables)]
     let mount_result = std::panic::catch_unwind(|| {
         leptos::logging::log!("[HYDRATE_ENTRY] 📦 Calling mount_to_body(App)...");
         #[cfg(target_arch = "wasm32")]

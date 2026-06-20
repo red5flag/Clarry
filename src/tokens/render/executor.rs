@@ -16,8 +16,6 @@ use super::dom;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::{JsCast, JsValue};
 #[cfg(target_arch = "wasm32")]
-use wasm_bindgen::closure::Closure;
-#[cfg(target_arch = "wasm32")]
 use js_sys;
 
 #[allow(unused_variables)]

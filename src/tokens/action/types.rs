@@ -21,9 +21,6 @@ impl From<String> for TokenAction {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-use leptos::web_sys;
-
 // ── Shared sub-types ─────────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]

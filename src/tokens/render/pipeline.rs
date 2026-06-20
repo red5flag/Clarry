@@ -7,9 +7,6 @@
 use leptos::prelude::*;
 use serde_json;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
-
 use crate::tokens::debug::{log_lifecycle, validate_tree, DebugConfig, inspector_log};
 
 use crate::tokens::action::TokenAction;

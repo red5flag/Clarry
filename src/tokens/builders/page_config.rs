@@ -63,7 +63,7 @@ impl PageConfig {
     }
 
     /// Attach the main page layout as a child of the config root.
-    pub fn page(mut self, content: impl IntoToken) -> Container {
+    pub fn page(self, content: impl IntoToken) -> Container {
         let mut root = self.root;
         // Inject palette CSS variables as a style block child
         let palette_css = self.palette.to_css_vars();

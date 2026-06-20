@@ -16,7 +16,10 @@ use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 
-use super::backends::{LocalStore, MemoryStore};
+#[cfg(not(target_arch = "wasm32"))]
+use super::backends::MemoryStore;
+#[cfg(target_arch = "wasm32")]
+use super::backends::LocalStore;
 use super::entry::notify;
 
 // ── Cache entry with TTL ─────────────────────────────────────────────────────
@@ -30,7 +33,7 @@ impl CacheEntry {
     fn new(value: impl Into<Arc<str>>) -> Self {
         Self { value: value.into(), expires_at: None }
     }
-    fn with_ttl(value: impl Into<Arc<str>>, ttl: Duration) -> Self {
+    fn _with_ttl(value: impl Into<Arc<str>>, ttl: Duration) -> Self {
         Self { value: value.into(), expires_at: Some(Instant::now() + ttl) }
     }
     fn is_expired(&self) -> bool {

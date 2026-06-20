@@ -29,7 +29,7 @@ fn next_id() -> crate::tokens::node::Str {
 /// Capture `RwSignal`s freely — they are `Copy + Send + Sync`.
 ///
 /// ```rust
-/// col().child(island(move || view! {
+/// col().add(island(move || view! {
 ///     <button on:click=move |_| count.update(|n| *n += 1)>
 ///         {move || count.get()}
 ///     </button>

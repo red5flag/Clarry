@@ -18,7 +18,7 @@ use super::factory::{text_read, text_dynamic};
 
 /// Derive a stable input element ID from a storage key.
 /// e.g. "notes.draft" → "notes_draft_input"
-fn input_id(storage_key: &str) -> String {
+fn _input_id(storage_key: &str) -> String {
     format!("{}_input", storage_key.replace('.', "_"))
 }
 

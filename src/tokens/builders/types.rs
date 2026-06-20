@@ -34,13 +34,13 @@ pub struct Container {
 
 impl Container {
     /// Add a child node to the current container.
-    pub fn child(mut self, node: impl IntoToken) -> Self {
+    pub fn add(mut self, node: impl IntoToken) -> Self {
         self.node_mut().children.push(node.into_node());
         self
     }
 
     /// Add multiple child nodes from an iterator.
-    pub fn children(mut self, nodes: impl IntoIterator<Item = impl IntoToken>) -> Self {
+    pub fn add_all(mut self, nodes: impl IntoIterator<Item = impl IntoToken>) -> Self {
         for node in nodes {
             self.node_mut().children.push(node.into_node());
         }
@@ -48,7 +48,7 @@ impl Container {
     }
 
     /// Add an optional child node.
-    pub fn child_opt(mut self, node: Option<impl IntoToken>) -> Self {
+    pub fn add_opt(mut self, node: Option<impl IntoToken>) -> Self {
         if let Some(node) = node {
             self.node_mut().children.push(node.into_node());
         }
@@ -208,6 +208,61 @@ impl Container {
         parent
     }
 
+    /// Card with inline storage: creates a card titled with the key name,
+    /// with a write_to control and read_from display embedded automatically.
+    /// Children indented under it are appended after the storage controls.
+    pub fn card_store(self, key: &'static str) -> Self {
+        use crate::tokens::action::store_set_input;
+        use crate::tokens::core::id::next_id as gen_id;
+
+        let input_id = gen_id();
+        let mut n = TokenNode::new(next_id());
+        n.tag = "div".into();
+        n.class = "p-4 bg-white rounded-lg shadow-sm space-y-2".into();
+
+        // Title = key name
+        let mut title_n = TokenNode::new(next_id());
+        title_n.content = Some(key.into());
+        title_n.class = "text-sm font-semibold text-gray-700 mb-1".into();
+        n.children.push(title_n);
+
+        // Key badge
+        let mut badge = TokenNode::new(next_id());
+        badge.content = Some(format!("storage: {key}").into());
+        badge.class = "text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded border border-gray-200 mb-2".into();
+        n.children.push(badge);
+
+        // Write row: input + Save button
+        let mut write_row = TokenNode::new(next_id());
+        write_row.layout = Layout::Row;
+        write_row.class = "flex items-center gap-1".into();
+
+        let mut input = TokenNode::new(input_id.clone());
+        input.tag = "input".into();
+        input.input_type = Some("text".into());
+        input.placeholder = Some("New value…".into());
+        input.class = "flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-400".into();
+        write_row.children.push(input);
+
+        let mut save_btn = TokenNode::new(next_id());
+        save_btn.tag = "button".into();
+        save_btn.content = Some("Save".into());
+        save_btn.class = "px-3 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded font-medium transition-colors".into();
+        save_btn.actions.push(store_set_input(key, input_id));
+        write_row.children.push(save_btn);
+        n.children.push(write_row);
+
+        // Read display — reactive text_read
+        let read_block = super::factory::text_read(key);
+        let mut read_n = read_block.into_node();
+        read_n.class = "text-sm font-mono bg-gray-50 border border-gray-200 rounded px-3 py-2 min-h-[2rem] break-all text-gray-700".into();
+        n.children.push(read_n);
+
+        let mut parent = self;
+        parent.stack.push(n);
+        parent
+    }
+
     pub fn card_named(self, name: impl Into<crate::tokens::node::Str>, title: impl Into<crate::tokens::node::Str>) -> Self {
         let name = name.into().to_string();
         let mut n = TokenNode::new(next_id());
@@ -231,9 +286,6 @@ impl Container {
         let mut parent = self;
         parent.node_mut().children.push(n);
         parent
-    }
-    pub fn section(self, t: impl Into<crate::tokens::node::Str>) -> Self {
-        self.section_title(t)
     }
 
     pub fn section_named(self, name: impl Into<crate::tokens::node::Str>, t: impl Into<crate::tokens::node::Str>) -> Self {
@@ -291,6 +343,185 @@ impl Container {
 
         let mut parent = self;
         parent.stack.push(n);
+        parent
+    }
+
+    pub fn command_palette(self, actions: Vec<crate::tokens::action::TokenAction>) -> Self {
+        let mut n = TokenNode::new(next_id());
+        n.tag = "button".into();
+        n.content = Some("⌘".into());
+        n.class = "text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300".into();
+        n.actions = actions;
+        let mut parent = self;
+        parent.node_mut().children.push(n);
+        parent
+    }
+
+    pub fn status_bar(self, items: Vec<impl IntoToken>) -> Self {
+        let mut n = TokenNode::new(next_id());
+        n.tag = "div".into();
+        n.layout = Layout::Row;
+        n.class = "text-xs text-gray-500 bg-gray-100 px-3 py-1".into();
+        for item in items {
+            let mut child = TokenNode::new(next_id());
+            child.tag = "span".into();
+            child.content = Some(item.into_node().content.unwrap_or_default());
+            n.children.push(child);
+        }
+        let mut parent = self;
+        parent.node_mut().children.push(n);
+        parent
+    }
+
+    pub fn modal(self, id: impl Into<crate::tokens::node::Str>, title: impl Into<crate::tokens::node::Str>, items: Vec<TokenNode>) -> Self {
+        use crate::tokens::action::TokenAction;
+        let id_str: crate::tokens::node::Str = id.into();
+        let title_str: crate::tokens::node::Str = title.into();
+
+        let mut backdrop = TokenNode::new(id_str.clone());
+        backdrop.tag = "div".into();
+        backdrop.class = "fixed inset-0 z-50 bg-black/50 flex items-center justify-center".into();
+        backdrop.style.extra = "background:rgba(0,0,0,0.5);display:none;".into();
+
+        let mut card = TokenNode::new(format!("{}_card", id_str));
+        card.tag = "div".into();
+        card.class = "bg-white rounded-lg shadow-lg max-w-md w-full mx-4 p-6 relative".into();
+
+        let mut header = TokenNode::new(format!("{}_header", id_str));
+        header.tag = "div".into();
+        header.class = "flex items-center justify-between mb-4".into();
+        let mut title_node = TokenNode::new(format!("{}_title", id_str));
+        title_node.tag = "h3".into();
+        title_node.content = Some(title_str);
+        title_node.class = "text-lg font-semibold text-gray-900".into();
+        header.children.push(title_node);
+
+        let mut close_btn = TokenNode::new(format!("{}_close", id_str));
+        close_btn.tag = "button".into();
+        close_btn.content = Some("✕".into());
+        close_btn.class = "text-gray-400 hover:text-gray-600 text-xl leading-none".into();
+        close_btn.actions.push(TokenAction::Hide(id_str));
+        header.children.push(close_btn);
+
+        card.children.push(header);
+        for item in items {
+            card.children.push(item);
+        }
+        backdrop.children.push(card);
+
+        let mut parent = self;
+        parent.node_mut().children.push(backdrop);
+        parent
+    }
+
+    pub fn tabs(self, active_signal: impl Into<crate::tokens::node::Str>, items: Vec<(crate::tokens::node::Str, TokenNode)>) -> Self {
+        use crate::tokens::action::TokenAction;
+        let signal = active_signal.into();
+        let mut tab_bar = TokenNode::new(next_id());
+        tab_bar.tag = "div".into();
+        tab_bar.class = "flex border-b border-gray-200 mb-4".into();
+
+        let mut panels = TokenNode::new(next_id());
+        panels.tag = "div".into();
+
+        let panel_ids: Vec<String> = (0..items.len())
+            .map(|idx| format!("{}_{}", signal, idx))
+            .collect();
+
+        for (idx, (label, content)) in items.into_iter().enumerate() {
+            let tab_key = format!("{}_{}", signal, idx);
+
+            let hide_ids: Vec<crate::tokens::node::Str> = panel_ids
+                .iter()
+                .filter(|id| id.as_str() != tab_key)
+                .map(|id| id.as_str().into())
+                .collect();
+
+            let mut tab = TokenNode::new(next_id());
+            tab.tag = "button".into();
+            tab.content = Some(label);
+            tab.class = "px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700".into();
+            tab.actions.push(TokenAction::Custom(format!("cycle:{}:{}", signal, tab_key).into()));
+            tab.actions.push(TokenAction::Show {
+                show: tab_key.clone().into(),
+                hide: hide_ids,
+            });
+            tab_bar.children.push(tab);
+
+            let mut panel = TokenNode::new(tab_key);
+            panel.tag = "div".into();
+            if idx > 0 {
+                panel.class = "hidden".into();
+            }
+            panel.children.push(content);
+            panels.children.push(panel);
+        }
+
+        let mut root = TokenNode::new(next_id());
+        root.tag = "div".into();
+        root.children.push(tab_bar);
+        root.children.push(panels);
+
+        let mut parent = self;
+        parent.node_mut().children.push(root);
+        parent
+    }
+
+    pub fn accordion(self, items: Vec<(crate::tokens::node::Str, TokenNode)>) -> Self {
+        use crate::tokens::action::TokenAction;
+        let mut root = TokenNode::new(next_id());
+        root.tag = "div".into();
+        root.class = "space-y-2".into();
+
+        for (idx, (title, content)) in items.into_iter().enumerate() {
+            let section_id = format!("accordion_{}", idx);
+
+            let mut header = TokenNode::new(next_id());
+            header.tag = "button".into();
+            header.content = Some(title);
+            header.class = "w-full text-left px-4 py-3 bg-gray-100 rounded-lg font-medium flex justify-between items-center".into();
+            header.actions.push(TokenAction::ToggleState {
+                key: section_id.clone().into(),
+                on_state: "true".into(),
+                off_state: "false".into(),
+            });
+
+            let mut panel = TokenNode::new(section_id.clone());
+            panel.tag = "div".into();
+            panel.class = "hidden px-4 py-2".into();
+            panel.children.push(content);
+
+            let mut section = TokenNode::new(next_id());
+            section.tag = "div".into();
+            section.children.push(header);
+            section.children.push(panel);
+            root.children.push(section);
+        }
+
+        let mut parent = self;
+        parent.node_mut().children.push(root);
+        parent
+    }
+
+    pub fn theme(self, vars: Vec<(&str, &str)>, items: Vec<TokenNode>) -> Self {
+        let css = vars.iter()
+            .map(|(k, v)| format!("  --{}: {};", k, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut style_node = TokenNode::new(next_id());
+        style_node.tag = "style".into();
+        style_node.content = Some(format!(":root {{\n{}\n}}", css).into());
+
+        let mut root = TokenNode::new(next_id());
+        root.tag = "div".into();
+        root.class = "p-4 rounded-lg border".into();
+        root.children.push(style_node);
+        for item in items {
+            root.children.push(item);
+        }
+
+        let mut parent = self;
+        parent.node_mut().children.push(root);
         parent
     }
 }

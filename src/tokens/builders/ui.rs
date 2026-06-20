@@ -8,7 +8,7 @@ use crate::tokens::node::{IntoToken, Layout, Str, TokenNode};
 use crate::tokens::core::id::next_id;
 use crate::tokens::action::TokenAction;
 use super::spec::TokenBuilder;
-use super::types::{Container, Row, Block, Col, Btn, Text};
+use super::types::{Container, Row, Block, Col, Text};
 use super::factory::{row, col, block, text, btn};
 
 #[cfg(target_arch = "wasm32")]
@@ -17,17 +17,17 @@ use wasm_bindgen::JsCast;
 // ── Layout / overlay primitives ───────────────────────────────────────────
 
 pub fn grid2() -> Row {
-    row().css("display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;")
+    row().set_class("display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0.75rem;")
 }
 
 pub fn grid3() -> Row {
-    row().css("display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;")
+    row().set_class("display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;")
 }
 
 pub fn skeleton(w: f32, h: f32) -> Block {
     block()
         .w(w).h(h)
-        .css("bg-gray-200 rounded animate-pulse")
+        .set_class("bg-gray-200 rounded animate-pulse")
 }
 
 pub fn overlay() -> Block {
@@ -69,7 +69,7 @@ pub fn tooltip(_target_id: impl Into<Str>, content: impl Into<Str>) -> Block {
 }
 
 pub fn drawer(id: impl Into<Str>, side: impl Into<Str>, content: impl Into<Str>) -> Block {
-    use crate::tokens::action::types::{TokenAction, EventBinding, EventType};
+    use crate::tokens::action::types::TokenAction;
     let id_str: Str = id.into();
     let side = side.into().to_string();
     let mut n = TokenNode::new(id_str.clone());
@@ -103,124 +103,13 @@ pub fn drawer(id: impl Into<Str>, side: impl Into<Str>, content: impl Into<Str>)
 
 // ── Modal / Tabs / Accordion ──────────────────────────────────────────────
 
-pub fn modal(id: impl Into<Str>, title: impl Into<Str>, children: impl IntoToken) -> Block {
-    let id_str: Str = id.into();
-    let title_str: Str = title.into();
-
-    let mut backdrop = TokenNode::new(id_str.clone());
-    backdrop.tag = "div".into();
-    backdrop.class = "fixed inset-0 z-50 bg-black/50 flex items-center justify-center".into();
-    backdrop.style.extra = "background:rgba(0,0,0,0.5);display:none;".into();
-
-    let mut card = TokenNode::new(format!("{}_card", id_str));
-    card.tag = "div".into();
-    card.class = "bg-white rounded-lg shadow-lg max-w-md w-full mx-4 p-6 relative".into();
-
-    let mut header = TokenNode::new(format!("{}_header", id_str));
-    header.tag = "div".into();
-    header.class = "flex items-center justify-between mb-4".into();
-    let mut title_node = TokenNode::new(format!("{}_title", id_str));
-    title_node.tag = "h3".into();
-    title_node.content = Some(title_str);
-    title_node.class = "text-lg font-semibold text-gray-900".into();
-    header.children.push(title_node);
-
-    let mut close_btn = TokenNode::new(format!("{}_close", id_str));
-    close_btn.tag = "button".into();
-    close_btn.content = Some("✕".into());
-    close_btn.class = "text-gray-400 hover:text-gray-600 text-xl leading-none".into();
-    close_btn.actions.push(TokenAction::Hide(id_str.clone()));
-    header.children.push(close_btn);
-
-    card.children.push(header);
-    card.children.push(children.into_node());
-    backdrop.children.push(card);
-
-    Container { stack: vec![backdrop] }
+// Helpers for tab/accordion item DSL
+pub fn tab(title: impl Into<Str>, content: impl IntoToken) -> (Str, TokenNode) {
+    (title.into(), content.into_node())
 }
 
-pub fn tabs(active_signal: impl Into<Str>, items: Vec<(&str, impl IntoToken + Clone)>) -> Block {
-    let signal = active_signal.into();
-    let mut tab_bar = TokenNode::new(next_id());
-    tab_bar.tag = "div".into();
-    tab_bar.class = "flex border-b border-gray-200 mb-4".into();
-
-    let mut panels = TokenNode::new(next_id());
-    panels.tag = "div".into();
-
-    let panel_ids: Vec<String> = (0..items.len())
-        .map(|idx| format!("{}_{}", signal, idx))
-        .collect();
-
-    for (idx, (label, content)) in items.into_iter().enumerate() {
-        let tab_key = format!("{}_{}", signal, idx);
-        let label_str: Str = label.into();
-
-        let hide_ids: Vec<Str> = panel_ids
-            .iter()
-            .filter(|id| id.as_str() != tab_key)
-            .map(|id| id.as_str().into())
-            .collect();
-
-        let mut tab = TokenNode::new(next_id());
-        tab.tag = "button".into();
-        tab.content = Some(label_str);
-        tab.class = "px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-gray-700".into();
-        tab.actions.push(TokenAction::Custom(format!("cycle:{}:{}", signal, tab_key).into()));
-        tab.actions.push(TokenAction::Show {
-            show: tab_key.clone().into(),
-            hide: hide_ids,
-        });
-        tab_bar.children.push(tab);
-
-        let mut panel = TokenNode::new(tab_key);
-        panel.tag = "div".into();
-        if idx > 0 {
-            panel.class = "hidden".into();
-        }
-        panel.children.push(content.into_node());
-        panels.children.push(panel);
-    }
-
-    let mut root = TokenNode::new(next_id());
-    root.tag = "div".into();
-    root.children.push(tab_bar);
-    root.children.push(panels);
-    Container { stack: vec![root] }
-}
-
-pub fn accordion(items: Vec<(impl Into<Str>, impl IntoToken)>) -> Block {
-    let mut root = TokenNode::new(next_id());
-    root.tag = "div".into();
-    root.class = "space-y-2".into();
-
-    for (idx, (title, content)) in items.into_iter().enumerate() {
-        let section_id = format!("accordion_{}", idx);
-        let title_str: Str = title.into();
-
-        let mut header = TokenNode::new(next_id());
-        header.tag = "button".into();
-        header.content = Some(title_str);
-        header.class = "w-full text-left px-4 py-3 bg-gray-100 rounded-lg font-medium flex justify-between items-center".into();
-        header.actions.push(TokenAction::ToggleState {
-            key: section_id.clone().into(),
-            on_state: "true".into(),
-            off_state: "false".into(),
-        });
-
-        let mut panel = TokenNode::new(section_id.clone());
-        panel.tag = "div".into();
-        panel.class = "hidden px-4 py-2".into();
-        panel.children.push(content.into_node());
-
-        let mut section = TokenNode::new(next_id());
-        section.tag = "div".into();
-        section.children.push(header);
-        section.children.push(panel);
-        root.children.push(section);
-    }
-
-    Container { stack: vec![root] }
+pub fn section(title: impl Into<Str>, content: impl IntoToken) -> (Str, TokenNode) {
+    (title.into(), content.into_node())
 }
 
 // ── Media primitives ───────────────────────────────────────────────────────
@@ -404,7 +293,7 @@ pub fn rating(id: impl Into<Str>, max: u8) -> Block {
 }
 
 pub fn skeleton_text(lines: u8) -> Col {
-    col().css("space-y-2").children((0..lines).map(|i| {
+    col().set_class("space-y-2").add_all((0..lines).map(|i| {
         skeleton(if i == lines - 1 { 16.0 } else { 24.0 }, 1.0)
     }))
 }
@@ -419,16 +308,16 @@ pub fn badge(label: impl Into<Str>, color: &str) -> Text {
 
 pub fn chip(label: impl Into<Str>, on_remove: Option<TokenAction>) -> Block {
     let mut c = block()
-        .css("inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-sm");
-    c = c.child(text(label));
+        .set_class("inline-flex items-center gap-1 px-3 py-1 rounded-full bg-gray-100 text-sm");
+    c = c.add(text(label));
     if let Some(action) = on_remove {
-        c = c.child(btn("×").css("text-gray-500 hover:text-gray-700 ml-1").act(action));
+        c = c.add(btn("×").set_class("text-gray-500 hover:text-gray-700 ml-1").push_action(action));
     }
     c
 }
 
 pub fn divider() -> Block {
-    block().css("w-full h-px bg-gray-200 my-2")
+    block().set_class("w-full h-px bg-gray-200 my-2")
 }
 
 pub fn spacer(rem: f32) -> Block {
@@ -443,16 +332,16 @@ pub fn copy_block(text_content: impl Into<Str> + Clone) -> Block {
         format!("copy_with_toast:{}", safe).into()
     );
     block()
-        .css("relative group")
-        .child(
+        .set_class("relative group")
+        .add(
             block()
-                .css("bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg overflow-x-auto whitespace-pre")
-                .child(text(t))
+                .set_class("bg-gray-900 text-green-400 font-mono text-sm p-4 rounded-lg overflow-x-auto whitespace-pre")
+                .add(text(t))
         )
-        .child(
+        .add(
             btn("Copy")
-                .css("absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-all")
-                .act(copy_toast_action)
+                .set_class("absolute top-2 right-2 text-xs bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-all")
+                .push_action(copy_toast_action)
         )
 }
 
@@ -524,20 +413,6 @@ pub fn tree_view(data_key: impl Into<Str>) -> Block {
     Container { stack: vec![n] }
 }
 
-pub fn status_bar(items: Vec<impl Into<Str>>) -> Block {
-    let mut n = TokenNode::new(next_id());
-    n.tag = "div".into();
-    n.layout = Layout::Row;
-    n.class = "text-xs text-gray-500 bg-gray-100 px-3 py-1".into();
-    for item in items {
-        let mut child = TokenNode::new(next_id());
-        child.tag = "span".into();
-        child.content = Some(item.into());
-        n.children.push(child);
-    }
-    Container { stack: vec![n] }
-}
-
 pub fn shortcut(keys: impl Into<Str>, action: TokenAction) -> Block {
     let mut n = TokenNode::new(next_id());
     n.tag = "kbd".into();
@@ -545,15 +420,6 @@ pub fn shortcut(keys: impl Into<Str>, action: TokenAction) -> Block {
     n.class = "inline-flex items-center gap-1 px-2 py-0.5 text-xs font-mono text-gray-600 bg-gray-100 border border-gray-300 rounded".into();
     n.actions.push(action);
     Container { stack: vec![n] }
-}
-
-pub fn command_palette(actions: Vec<TokenAction>) -> Btn {
-    let mut n = TokenNode::new(next_id());
-    n.tag = "button".into();
-    n.content = Some("⌘".into());
-    n.class = "text-sm px-2 py-1 rounded bg-gray-200 hover:bg-gray-300".into();
-    n.actions = actions;
-    Btn(n)
 }
 
 // ── Accessibility primitives ────────────────────────────────────────────────
@@ -578,20 +444,15 @@ pub fn live_region(key: impl Into<Str>, politeness: &str) -> Block {
 pub fn skip_link(target: impl Into<Str>) -> Block {
     let href = format!("#{}", target.into());
     block()
-        .css("sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-white px-4 py-2 z-50")
-        .child(text("Skip to content").attr("href", href))
+        .set_class("sr-only focus:not-sr-only focus:absolute focus:top-0 focus:left-0 bg-white px-4 py-2 z-50")
+        .add(text("Skip to content").attr("href", href))
 }
 
 // ── Theme provider ──────────────────────────────────────────────────────────
 
-/// Flat key-value theme: `theme("primary", "#3b82f6", "danger", "#ef4444", ..., content)`
+/// Flat key-value theme: `theme(vec![("primary", "#3b82f6"), ...], content)`
 /// Pairs of (key, value) strings followed by a content token.
-#[macro_export]
-macro_rules! theme {
-    ($($key:expr, $val:expr),+ ; $content:expr) => {
-        theme_provider(vec![$( ($key, $val) ),+], $content)
-    };
-}
+/// Kept as a free helper for non-DSL usage.
 pub fn theme_provider(vars: Vec<(&str, &str)>, content: impl IntoToken) -> Block {
     let css = vars.iter()
         .map(|(k, v)| format!("  --{}: {};", k, v))

@@ -28,7 +28,7 @@ fn preprocess_token_dsl(content: &str) -> String {
     let real_containers: &[&str] = &[
         "col(", "row(", "block(", "grid(", "grid2(", "grid3(",
         "stack(", "split(", "aspect(", "overlay(", "portal(",
-        "drawer(", "card(", "tooltip(",
+        "drawer(", "card(", "card_store(", "tooltip(", "command_palette(", "status_bar(", "modal(", "tabs(", "accordion(", "theme(",
     ];
 
     // Leaf-type nodes: accept modifier lines but do NOT emit .end()
@@ -45,10 +45,10 @@ fn preprocess_token_dsl(content: &str) -> String {
         "caption(", "label(", "mono(", "italic(", "strike(", "underline(", "color(",
         "loading(", "disabled(",
         "sr(", "sr_only(", "skip_link(", "live(", "live_region(",
-        "terminal(", "log_view(", "hex_view(", "tree_view(", "status_bar(",
-        "command_palette(", "shortcut(", "toast_container(", "chat_bubble(",
+        "terminal(", "log_view(", "hex_view(", "tree_view(",
+        "shortcut(", "toast_container(", "chat_bubble(",
         "chat_ui(", "divider(", "spacer(",
-        "modal(", "tabs(", "accordion(", "theme_provider(", "theme!(",
+        "tab(", "section(", "theme_provider(",
         "pill_chip(",
         "write_to(", "read_from(", "add_to(", "remove_from(", "clear_key(",
         "load_from(", "storage_panel(", "list_panel(", "file_storage_panel(",
@@ -75,10 +75,10 @@ fn preprocess_token_dsl(content: &str) -> String {
         "aria_label", "aria_hidden", "aria_live",
         // Conditional branches
         "then", "else",
-        // Shorthand method aliases (emitted as .method(...) chain, not .child())
+        // Shorthand method aliases (emitted as .method(...) chain, not .add())
         "var", "sz", "inc", "dec", "tog", "cyc", "in_",
         "on_nav", "use_var", "append_css",
-        "anim_pulse", "section", "section_title",
+        "anim_pulse", "section_title",
     ];
     // Zero-arg modifier flags (just `.flag()`)
     let modifier_flags: &[&'static str] = &[
@@ -109,7 +109,7 @@ fn preprocess_token_dsl(content: &str) -> String {
                 return Some((kw, rest));
             }
             // Also match old-style keyword(...) calls: css("..."), act(...), id("...")
-            // These appear at deeper indent and should become .keyword(...) chains, not .child()
+            // These appear at deeper indent and should become .keyword(...) chains, not .add()
             if s.starts_with(kw) && s.as_bytes().get(kw.len()) == Some(&b'(') {
                 // Return entire call as-is; the emitter will prefix with `.`
                 return Some((kw, &s[kw.len()..]));
@@ -197,17 +197,19 @@ fn preprocess_token_dsl(content: &str) -> String {
     }
 
     let mut result: Vec<String> = Vec::new();
-    // Stack of (indent_level, needs_end)
-    let mut container_stack: Vec<(usize, bool)> = Vec::new();
+    // Stack of (indent_level, needs_end, container_name).  Names are used to
+    // special-case containers whose indented children should be emitted as a
+    // collected argument (e.g. command_palette collects TokenActions into a vec).
+    let mut container_stack: Vec<(usize, bool, String)> = Vec::new();
     let mut paren_depth: i32 = 0;
     let mut in_string = false;
     let mut string_char = '\0';
     let mut escape_next = false;
-    // When wrapping a multi-line expression in .child(...), track the depth at
-    // which the .child( was opened so we can close it when paren_depth returns.
+    // When wrapping a multi-line expression in .add(...), track the depth at
+    // which the .add( was opened so we can close it when paren_depth returns.
     let mut pending_child_close_at: i32 = -1;
-    // When a leaf is wrapped as .child(leaf_call), modifiers indented under it
-    // must be folded INTO that .child() call rather than chained on the parent.
+    // When a leaf is wrapped as .add(leaf_call), modifiers indented under it
+    // must be folded INTO that .add() call rather than chained on the parent.
     // pending_leaf_indent = Some(leaf_indent) while we are inside such a leaf.
     // Any modifier whose indent > leaf_indent is appended to the last result line
     // (stripping its trailing `)`) instead of being pushed as a new line.
@@ -259,7 +261,7 @@ fn preprocess_token_dsl(content: &str) -> String {
         escape_next = line_escape;
 
         // Inside an open paren block → pass through unchanged.
-        // If we opened a .child( wrapper and paren_depth just returned to 0,
+        // If we opened a .add( wrapper and paren_depth just returned to 0,
         // append the closing ) to the last line.
         if was_inside_parens {
             if paren_depth == 0 && pending_child_close_at == 0 {
@@ -287,29 +289,101 @@ fn preprocess_token_dsl(content: &str) -> String {
             continue;
         }
 
+        // Helper: extract the first token (identifier) from a stripped line.
+        fn first_token(s: &str) -> &str {
+            let end = s.find(|c: char| !c.is_alphanumeric() && c != '_' && c != '!')
+                .unwrap_or(s.len());
+            &s[..end]
+        }
+
+        // Any non-modifier, non-comment standalone line at or below leaf indent
+        // ends the pending-leaf modifier window.
+        if is_standalone && !stripped.starts_with("//") {
+            if let Some(leaf_indent) = pending_leaf_indent {
+                if indent <= leaf_indent {
+                    pending_leaf_indent = None;
+                }
+            }
+        }
+
+        // ── Close containers whose indent ≥ current line ─────────────────
+        // This runs before the modifier check so that a modifier which is at a
+        // shallower indent than an open nested container is emitted on the
+        // correct parent, not inside the still-open child.
+        if is_standalone && !container_stack.is_empty() {
+            let parent_indent = container_stack.last().unwrap().0;
+            if indent <= parent_indent {
+                while let Some(&(last_indent, _needs_end, _)) = container_stack.last() {
+                    if indent <= last_indent {
+                        let (_, needs_end, name) = container_stack.pop().unwrap();
+                        if needs_end {
+                            // Direct child of modal is a real container whose .end() must be
+                            // converted to a TokenNode so it can be collected into the vec.
+                            let is_token_collector_child = container_stack.last().map(|(_, _, n)| n == "modal" || n == "theme").unwrap_or(false);
+                            // command_palette/status_bar/modal collect into a vec.
+                            let close = if name == "command_palette" || name == "status_bar" || name == "modal" || name == "tabs" || name == "accordion" || name == "theme" {
+                                "])"
+                            } else if is_token_collector_child {
+                                ".end().into_node(),"
+                            } else {
+                                ".end()"
+                            };
+                            result.push(" ".repeat(indent) + close);
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
         // ── Bare modifier keyword: css / act / id / variant / ... ─────────
-        // MUST be checked BEFORE close-container logic so that a modifier at
-        // the same indent as its parent node does not accidentally close it.
         // Modifiers attach as method calls to the most-recently opened node.
         // They do NOT push the stack, do NOT close any container.
         //
         // Special case: if pending_leaf_indent is set and this modifier is
-        // indented deeper than the leaf, fold it INTO the .child() call by
+        // indented deeper than the leaf, fold it INTO the .add() call by
         // appending to the last result line (stripping trailing `)` first).
-        if is_standalone {
+        // Inside a collector block, children are collected arguments, not
+        // modifiers.  Skip the modifier check only if the current line is actually
+        // indented deeper than the collector line; otherwise the line may be closing it.
+        let inside_collector = container_stack.last().map_or(false, |(i, _, name)| {
+            (name == "command_palette" || name == "status_bar") && indent > *i
+        });
+
+        if is_standalone && !inside_collector {
             if let Some((kw, rest)) = check_modifier(stripped, modifier_keywords, modifier_flags) {
-                let method_name = if kw == "else" { "else_" } else { kw };
+                let method_name = match kw {
+                    "css" => "set_class",
+                    "act" => "push_action",
+                    "else" => "else_",
+                    _ => kw,
+                };
                 let modifier_str = if rest.is_empty() {
                     format!(".{}()", method_name)
                 } else if rest.starts_with('(') {
                     format!(".{}{}", method_name, rest)
+                } else if method_name == "cyc" {
+                    // cyc key, a, b, c → .cyc("key", vec!["a", "b", "c"])
+                    let parts: Vec<String> = split_top_level_commas(rest)
+                        .into_iter()
+                        .map(|s| s.trim().to_string())
+                        .filter(|s| !s.is_empty())
+                        .collect();
+                    if let Some((key, states)) = parts.split_first() {
+                        let key_quoted = quote_arg(key);
+                        let states_quoted: Vec<String> = states.iter().map(|s| quote_arg(s)).collect();
+                        format!(".{}({}, vec![{}])", method_name, key_quoted, states_quoted.join(", "))
+                    } else {
+                        format!(".{}({})", method_name, quote_arg(rest))
+                    }
                 } else {
                     format!(".{}({})", method_name, rest)
                 };
 
                 if let Some(leaf_indent) = pending_leaf_indent {
                     if indent > leaf_indent && line_paren_delta == 0 {
-                        // Fold into the pending .child(leaf...) call —
+                        // Fold into the pending .add(leaf...) call —
                         // only when the modifier value is single-line (no open parens)
                         if let Some(last) = result.last_mut() {
                             // Strip trailing ) and space, append modifier, re-close
@@ -332,48 +406,24 @@ fn preprocess_token_dsl(content: &str) -> String {
             }
         }
 
-        // Any non-modifier, non-comment standalone line at or below leaf indent
-        // ends the pending-leaf modifier window.
-        if is_standalone && !stripped.starts_with("//") {
-            if let Some(leaf_indent) = pending_leaf_indent {
-                if indent <= leaf_indent {
-                    pending_leaf_indent = None;
-                }
-            }
-        }
-
-        // ── Close containers whose indent ≥ current line ─────────────────
-        if is_standalone && !container_stack.is_empty() {
-            let parent_indent = container_stack.last().unwrap().0;
-            if indent <= parent_indent {
-                while let Some(&(last_indent, needs_end)) = container_stack.last() {
-                    if indent <= last_indent {
-                        container_stack.pop();
-                        if needs_end {
-                            result.push(" ".repeat(indent) + ".end()");
-                        }
-                    } else {
-                        break;
-                    }
-                }
-            }
-        }
-
         // ── Transform standalone calls inside a container context ─────────
         // Macro invocations (theme!(...), vec![...]) inside a container get wrapped
-        // in .child() — they cannot be turned into .method() calls directly.
+        // in .add() — they cannot be turned into .method() calls directly.
         let is_macro_call = {
             let s = stripped.trim_start_matches(|c: char| c.is_alphanumeric() || c == '_');
             s.starts_with("!(") || s.starts_with("![")
         };
+        // Determine if the current container is a special collector container.
+        let parent_collector = container_stack.last().map(|(_, _, name)| name.clone());
+
         if is_standalone && is_macro_call && !container_stack.is_empty() {
             let parent_indent = container_stack.last().unwrap().0;
             if indent > parent_indent {
                 if line_paren_delta > 0 {
-                    result.push(format!("{}.child({}", " ".repeat(indent), stripped));
+                    result.push(format!("{}.add({}", " ".repeat(indent), stripped));
                     pending_child_close_at = 0;
                 } else {
-                    result.push(format!("{}.child({})", " ".repeat(indent), stripped));
+                    result.push(format!("{}.add({})", " ".repeat(indent), stripped));
                 }
                 continue;
             }
@@ -383,20 +433,54 @@ fn preprocess_token_dsl(content: &str) -> String {
             if indent > parent_indent {
                 if is_real_container(stripped) {
                     // Real containers: .row(), .col(), .block() etc. — method on Container, push stack
-                    result.push(" ".repeat(indent) + "." + stripped);
-                    container_stack.push((indent, true));
+                    let name = first_token(stripped);
+                    let parent_is_token_collector = parent_collector.as_deref() == Some("modal") || parent_collector.as_deref() == Some("theme");
+                    let line = if name == "command_palette" || name == "status_bar" {
+                        format!("{}.{name}(vec![", " ".repeat(indent))
+                    } else if name == "modal" {
+                        // modal id, title collects children as TokenNode items.
+                        let args = stripped.trim_start_matches("modal(").trim_end_matches(")");
+                        format!("{}.modal({}, vec![", " ".repeat(indent), args)
+                    } else if name == "tabs" {
+                        let args = stripped.trim_start_matches("tabs(").trim_end_matches(")");
+                        format!("{}.tabs({}, vec![", " ".repeat(indent), args)
+                    } else if name == "accordion" {
+                        format!("{}.accordion(vec![", " ".repeat(indent))
+                    } else if name == "theme" {
+                        let args = stripped.trim_start_matches("theme(").trim_end_matches(")");
+                        format!("{}.theme({}, vec![", " ".repeat(indent), args)
+                    } else if parent_is_token_collector {
+                        // Children of modal/theme are collected into a vec as standalone builders,
+                        // not as methods on the parent.
+                        " ".repeat(indent) + stripped
+                    } else {
+                        " ".repeat(indent) + "." + stripped
+                    };
+                    result.push(line);
+                    container_stack.push((indent, true, name.to_string()));
                     pending_leaf_indent = None; // real container opens a new scope
+                } else if parent_collector.as_deref() == Some("command_palette") || parent_collector.as_deref() == Some("status_bar") || parent_collector.as_deref() == Some("tabs") || parent_collector.as_deref() == Some("accordion") {
+                    // command_palette/status_bar/tabs/accordion collect children into a vec literal.
+                    // Each child is emitted as a bare expression followed by a comma.
+                    result.push(format!("{}{},", " ".repeat(indent), stripped));
+                    pending_leaf_indent = None;
+                } else if parent_collector.as_deref() == Some("modal") || parent_collector.as_deref() == Some("theme") {
+                    // modal/theme collect their children as TokenNode items in a vec.
+                    // Real-container children get .into_node() appended when they close;
+                    // leaf children get it here.
+                    result.push(format!("{}{}.into_node(),", " ".repeat(indent), stripped));
+                    pending_leaf_indent = None;
                 } else if is_leaf_container(stripped) || true {
-                    // Leaf factories and other standalone calls: wrap in .child()
+                    // Leaf factories and other standalone calls: wrap in .add()
                     if line_paren_delta > 0 {
-                        // Multi-line expression: open .child( without closing )
+                        // Multi-line expression: open .add( without closing )
                         // The closing ) will be appended when paren_depth returns to 0
-                        result.push(format!("{}.child({}", " ".repeat(indent), stripped));
+                        result.push(format!("{}.add({}", " ".repeat(indent), stripped));
                         pending_child_close_at = 0;
                         // Multi-line leaves can't use pending_leaf_indent folding
                         pending_leaf_indent = None;
                     } else {
-                        result.push(format!("{}.child({})", " ".repeat(indent), stripped));
+                        result.push(format!("{}.add({})", " ".repeat(indent), stripped));
                         // Record leaf indent so subsequent modifier lines fold in
                         pending_leaf_indent = Some(indent);
                     }
@@ -410,8 +494,27 @@ fn preprocess_token_dsl(content: &str) -> String {
         // ── Top-level standalone container factory → open indent level ────
         if is_standalone && is_container_method(stripped) {
             let needs_end = is_real_container(stripped);
-            container_stack.push((indent, needs_end));
-            result.push(line.to_string());
+            let name = first_token(stripped).to_string();
+            // command_palette/status_bar/modal are Container methods that collect their
+            // children into a vec. They open a real-container scope but emit the vec opening.
+            let line = if name == "command_palette" || name == "status_bar" {
+                format!("{}.{name}(vec![", " ".repeat(indent))
+            } else if name == "modal" {
+                let args = stripped.trim_start_matches("modal(").trim_end_matches(")");
+                format!("{}.modal({}, vec![", " ".repeat(indent), args)
+            } else if name == "tabs" {
+                let args = stripped.trim_start_matches("tabs(").trim_end_matches(")");
+                format!("{}.tabs({}, vec![", " ".repeat(indent), args)
+            } else if name == "accordion" {
+                format!("{}.accordion(vec![", " ".repeat(indent))
+            } else if name == "theme" {
+                let args = stripped.trim_start_matches("theme(").trim_end_matches(")");
+                format!("{}.theme({}, vec![", " ".repeat(indent), args)
+            } else {
+                line.to_string()
+            };
+            container_stack.push((indent, needs_end, name));
+            result.push(line);
             continue;
         }
 
@@ -420,9 +523,10 @@ fn preprocess_token_dsl(content: &str) -> String {
 
     // Close any remaining open real-containers at EOF
     while container_stack.len() > 1 {
-        let (_, needs_end) = container_stack.pop().unwrap();
+        let (_, needs_end, name) = container_stack.pop().unwrap();
         if needs_end {
-            result.push(".end()".to_string());
+            let close = if name == "command_palette" || name == "status_bar" || name == "modal" || name == "tabs" || name == "accordion" || name == "theme" { "])" } else { ".end()" };
+            result.push(close.to_string());
         }
     }
 
@@ -530,6 +634,421 @@ fn rewrite_vec_literals(content: &str) -> String {
     out
 }
 
+/// Normalize bare DSL syntax (no brackets, no quotes on non-text args) into
+/// the canonical parenthesized form that `preprocess_token_dsl` expects.
+///
+/// Transforms:
+///   col                    → col()
+///   txt "Hello"            → txt("Hello")        (quoted text stays quoted)
+///   write_to demo.key      → write_to("demo.key") (bare arg gets quoted)
+///   css min-h-screen p-6   → css "min-h-screen p-6"
+///   id demo_page           → id "demo_page"
+///   act store_set key, val → act store_set("key", "val")
+///   grid 3                 → grid(3)              (numeric stays unquoted)
+///   badge "New", #3b82f6   → badge("New", "#3b82f6")
+fn normalize_bare_syntax(content: &str) -> String {
+    let modifier_kws: &[&str] = &[
+        "css", "act", "acts", "id", "variant", "size", "size_str",
+        "nav", "placeholder", "href", "src", "alt",
+        "min", "max", "step", "rows", "cols",
+        "name", "for_id",
+        "aria_label", "aria_hidden", "aria_live",
+        "then", "else",
+        "var", "sz", "inc", "dec", "tog", "cyc", "in_",
+        "on_nav", "use_var", "append_css",
+        "section_title",
+    ];
+
+    let mut result = Vec::new();
+    let mut paren_depth: i32 = 0;
+    let mut bracket_depth: i32 = 0;
+    let mut in_string = false;
+    let mut string_char = '\0';
+    let mut escape_next = false;
+    // When we are inside a command_palette or status_bar block, children are
+    // collected arguments, not modifiers.  Track by the indent of the collector line.
+    let mut collector_indent: Option<usize> = None;
+
+    for line in content.lines() {
+        let stripped = line.trim_start();
+        let indent = line.len() - stripped.len();
+
+        // If we left the collector block, clear the tracker.
+        if let Some(cp_indent) = collector_indent {
+            if indent <= cp_indent {
+                collector_indent = None;
+            }
+        }
+
+        // ── Track paren/bracket depth (skip strings) ───────────────────
+        let mut line_paren_delta = 0i32;
+        let mut line_bracket_delta = 0i32;
+        let mut line_in_string = in_string;
+        let mut line_string_char = string_char;
+        let mut line_escape = escape_next;
+        let is_comment = stripped.starts_with("//");
+
+        if !is_comment {
+            for c in line.chars() {
+                if line_escape { line_escape = false; continue; }
+                if c == '\\' { line_escape = true; continue; }
+                if line_in_string {
+                    if c == line_string_char { line_in_string = false; }
+                } else if c == '"' || c == '\'' {
+                    line_in_string = true;
+                    line_string_char = c;
+                } else if c == '(' {
+                    line_paren_delta += 1;
+                } else if c == ')' {
+                    line_paren_delta -= 1;
+                } else if c == '[' {
+                    line_bracket_delta += 1;
+                    line_paren_delta += 1;
+                } else if c == ']' {
+                    line_bracket_delta -= 1;
+                    line_paren_delta -= 1;
+                }
+            }
+        }
+
+        let was_inside_parens = paren_depth > 0;
+        let was_inside_brackets = bracket_depth > 0;
+        paren_depth += line_paren_delta;
+        bracket_depth += line_bracket_delta;
+        in_string = line_in_string;
+        string_char = line_string_char;
+        escape_next = line_escape;
+
+        // Skip blank, comment, method-chain lines.
+        // Lines inside parens (from a previous line) pass through unchanged.
+        // Lines inside brackets (vec literals) still get normalized so that
+        // bare action calls like `tog cmd_dark` become `tog("cmd_dark")`.
+        if stripped.is_empty() || is_comment || stripped.starts_with('.') {
+            result.push(line.to_string());
+            continue;
+        }
+        if was_inside_parens && !was_inside_brackets {
+            // Inside an unclosed ( — pass through unchanged
+            result.push(line.to_string());
+            continue;
+        }
+
+        // Find first token end
+        let token_end = stripped
+            .find(|c: char| !c.is_alphanumeric() && c != '_' && c != '!')
+            .unwrap_or(stripped.len());
+
+        // Already has parens right after token → old syntax, skip
+        if token_end < stripped.len() && stripped.as_bytes()[token_end] == b'(' {
+            result.push(line.to_string());
+            continue;
+        }
+
+        let first_token = &stripped[..token_end];
+        let rest = stripped[token_end..].trim();
+
+        // Entering a collector block: remember its indent so children are
+        // treated as collected arguments, not as DSL modifiers.
+        if (first_token == "command_palette" || first_token == "status_bar") && collector_indent.is_none() {
+            collector_indent = Some(indent);
+        }
+        let inside_collector = collector_indent.is_some();
+
+        // Modifier keyword: quote bare value(s) — but only when NOT inside
+        // a bracket (vec literal) or inside a collector block. Inside brackets,
+        // `tog cmd_dark` should become `tog("cmd_dark")`, not a modifier chain.
+        // Inside command_palette/status_bar, children are collected arguments.
+        if !was_inside_brackets && !inside_collector && modifier_kws.contains(&first_token) {
+            if rest.is_empty() {
+                result.push(line.to_string());
+            } else if first_token == "act" {
+                let normalized = normalize_act_args(rest);
+                result.push(format!("{}{} {}", " ".repeat(indent), first_token, normalized));
+            } else {
+                let normalized = normalize_args(rest);
+                result.push(format!("{}{} {}", " ".repeat(indent), first_token, normalized));
+            }
+            continue;
+        }
+
+        // Special case: theme key value, key value, ... → theme(vec![...])
+        if first_token == "theme" {
+            let rest_trimmed = rest.trim_end_matches(',').trim();
+            let pairs = split_top_level_commas(rest_trimmed);
+            let mut normalized_pairs = Vec::new();
+            for pair in pairs {
+                let mut parts = pair.trim().split_whitespace();
+                if let (Some(k), Some(v)) = (parts.next(), parts.next()) {
+                    normalized_pairs.push(format!(
+                        "({}, {})",
+                        quote_arg(k),
+                        quote_arg(v)
+                    ));
+                }
+            }
+            result.push(format!(
+                "{}theme(vec![{}])",
+                " ".repeat(indent),
+                normalized_pairs.join(", ")
+            ));
+            continue;
+        }
+
+        // Special case: cyc key, a, b, c → cyc("key", vec!["a", "b", "c"])
+        if first_token == "cyc" && !rest.is_empty() {
+            let rest_trimmed = rest.trim_end_matches(',').trim();
+            let parts: Vec<String> = split_top_level_commas(rest_trimmed)
+                .into_iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            if let Some((key, states)) = parts.split_first() {
+                let key_quoted = quote_arg(key);
+                let states_quoted: Vec<String> = states.iter().map(|s| quote_arg(s)).collect();
+                result.push(format!(
+                    "{}cyc({}, vec![{}])",
+                    " ".repeat(indent),
+                    key_quoted,
+                    states_quoted.join(", ")
+                ));
+            } else {
+                result.push(format!("{}cyc({})", " ".repeat(indent), quote_arg(rest_trimmed)));
+            }
+            continue;
+        }
+
+        // Container/leaf call without parens — only transform if it looks
+        // like a DSL call (lowercase first char, not Rust keywords like use/pub/fn/let)
+        if !first_token.is_empty()
+            && first_token.chars().next().unwrap().is_lowercase()
+            && !matches!(first_token, "use" | "let" | "fn" | "pub" | "mod" | "return" | "if" | "else" | "for" | "while" | "match" | "move" | "async" | "await" | "static" | "const" | "struct" | "enum" | "impl" | "trait" | "type" | "where" | "self" | "super" | "crate" | "extern" | "unsafe" | "ref" | "mut" | "as" | "in" | "break" | "continue")
+        {
+            if rest.is_empty() {
+                result.push(format!("{}{}()", " ".repeat(indent), first_token));
+            } else if line_paren_delta > 0 {
+                // Line opens unclosed bracket/paren — normalize args before
+                // the first unclosed `[`, then append the rest as-is without
+                // a closing `)`.
+                let (before, after) = split_at_unclosed_bracket(rest);
+                if before.is_empty() {
+                    result.push(format!("{}{}({}", " ".repeat(indent), first_token, after));
+                } else {
+                    let normalized = normalize_args(&before);
+                    result.push(format!("{}{}({}, {}", " ".repeat(indent), first_token, normalized, after));
+                }
+            } else {
+                let rest_trimmed = rest.trim_end_matches(',').trim();
+                let normalized = normalize_args(rest_trimmed);
+                result.push(format!("{}{}({})", " ".repeat(indent), first_token, normalized));
+            }
+            continue;
+        }
+
+        result.push(line.to_string());
+    }
+
+    result.join("\n")
+}
+
+/// Split a string at the first unclosed `[` bracket.
+/// Returns (before_bracket, from_bracket_onward).
+/// e.g. `demo_tabs, [` → ("demo_tabs", "[")
+///      `demo_select, ["A", "B"]` → ("", "demo_select, [\"A\", \"B\"]") (balanced, returns empty before)
+fn split_at_unclosed_bracket(s: &str) -> (String, String) {
+    let chars: Vec<char> = s.chars().collect();
+    let mut depth = 0i32;
+    let mut in_str = false;
+
+    for (i, &c) in chars.iter().enumerate() {
+        if in_str {
+            if c == '"' { in_str = false; }
+            continue;
+        }
+        if c == '"' { in_str = true; continue; }
+        if c == '[' {
+            if depth == 0 {
+                // Check if this `[` is unclosed on this line
+                let mut sub_depth = 0i32;
+                let mut sub_in_str = false;
+                for &sc in &chars[i..] {
+                    if sub_in_str {
+                        if sc == '"' { sub_in_str = false; }
+                    } else if sc == '"' {
+                        sub_in_str = true;
+                    } else if sc == '[' {
+                        sub_depth += 1;
+                    } else if sc == ']' {
+                        sub_depth -= 1;
+                    }
+                }
+                if sub_depth > 0 {
+                    // Unclosed `[` — split here
+                    let before: String = chars[..i].iter().collect();
+                    let after: String = chars[i..].iter().collect();
+                    let before = before.trim_end().trim_end_matches(',').trim_end().to_string();
+                    return (before, after);
+                }
+            }
+            depth += 1;
+        } else if c == ']' {
+            depth -= 1;
+        }
+    }
+    // No unclosed bracket — return whole string as "after"
+    (String::new(), s.to_string())
+}
+
+/// Normalize `act` arguments: `store_set key, val` → `store_set("key", "val")`
+fn normalize_act_args(rest: &str) -> String {
+    if rest.contains('(') {
+        return rest.to_string();
+    }
+    let space_pos = rest.find(' ');
+    if space_pos.is_none() {
+        return format!("{}()", rest);
+    }
+    let func_name = &rest[..space_pos.unwrap()];
+    let args_str = rest[space_pos.unwrap() + 1..].trim();
+    if args_str.is_empty() {
+        return format!("{}()", func_name);
+    }
+    let normalized = normalize_args(args_str);
+    format!("{}({})", func_name, normalized)
+}
+
+/// Normalize a comma-separated argument list, quoting bare string args.
+fn normalize_args(args: &str) -> String {
+    let parts = split_top_level_commas(args);
+    let normalized: Vec<String> = parts.iter().map(|p| quote_arg(p.trim())).collect();
+    normalized.join(", ")
+}
+
+/// Quote a single argument if it's a bare string. Leave numbers, quoted
+/// strings, arrays, function calls, and special values unchanged.
+fn quote_arg(arg: &str) -> String {
+    let trimmed = arg.trim();
+    if trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+    // Already quoted
+    if trimmed.starts_with('"') {
+        return trimmed.to_string();
+    }
+    // Parenthesized expression
+    if trimmed.starts_with('(') {
+        return trimmed.to_string();
+    }
+    // Numeric literal
+    if trimmed.parse::<f64>().is_ok() {
+        return trimmed.to_string();
+    }
+    // Special values
+    if trimmed == "None" || trimmed == "true" || trimmed == "false" {
+        return trimmed.to_string();
+    }
+    // Array literal: [a, b, c] → ["a", "b", "c"]
+    if trimmed.starts_with('[') && trimmed.ends_with(']') {
+        let inner = &trimmed[1..trimmed.len() - 1];
+        if inner.trim().is_empty() {
+            return trimmed.to_string();
+        }
+        let elements = split_top_level_commas(inner);
+        let quoted: Vec<String> = elements.iter().map(|e| quote_arg(e.trim())).collect();
+        return format!("[{}]", quoted.join(", "));
+    }
+    // vec! macro
+    if trimmed.starts_with("vec![") && trimmed.ends_with(']') {
+        let inner = &trimmed[5..trimmed.len() - 1];
+        if inner.trim().is_empty() {
+            return trimmed.to_string();
+        }
+        let elements = split_top_level_commas(inner);
+        let quoted: Vec<String> = elements.iter().map(|e| quote_arg(e.trim())).collect();
+        return format!("vec![{}]", quoted.join(", "));
+    }
+    // Contains '(' — likely a function call, keep as-is
+    if trimmed.contains('(') {
+        return trimmed.to_string();
+    }
+    // Bare function call: `func_name arg1, arg2` → `func_name("arg1", "arg2")`
+    // Only trigger if first_word is a known action/function prefix, to avoid
+    // misinterpreting CSS class strings like `relative h-24` as function calls.
+    if let Some(sp) = trimmed.find(' ') {
+        let first_word = &trimmed[..sp];
+        let is_known_fn = matches!(
+            first_word,
+            "store_set" | "store_get" | "store_delete" | "store_set_input" |
+            "store_set_ttl" | "store_watch" | "store_inc" |
+            "toggle" | "copy_to_clipboard" | "url" | "nav" | "navigate" |
+            "show" | "hide" | "increment" | "decrement" | "cycle" |
+            "preload" | "fetch_get" | "fetch_post" | "set_theme_var" |
+            "chat_send" | "in_"
+        );
+        if is_known_fn {
+            let func_args = trimmed[sp..].trim();
+            if func_args.is_empty() {
+                return format!("{}()", first_word);
+            }
+            let normalized = normalize_args(func_args);
+            return format!("{}({})", first_word, normalized);
+        }
+    }
+    // Standalone builder call used as an argument (e.g. inside tab/section) —
+    // normalize it as a function call if the first word is a known DSL builder.
+    if let Some(sp) = trimmed.find(' ') {
+        let first_word = &trimmed[..sp];
+        let is_builder = matches!(
+            first_word,
+            "txt" | "text" | "col" | "row" | "block" | "grid" | "grid2" | "grid3" | "btn" | "h1" | "h2" | "h3" | "bold" | "muted" | "center" | "label" | "mono" | "italic" | "strike" | "underline" | "color"
+        );
+        if is_builder {
+            let func_args = trimmed[sp..].trim();
+            if func_args.is_empty() {
+                return format!("{}()", first_word);
+            }
+            let normalized = normalize_args(func_args);
+            return format!("{}({})", first_word, normalized);
+        }
+    }
+    // Bare string — wrap in quotes. Directory notation for storage keys uses
+    // `/` as a separator, so canonicalise it to the dotted form used by the Store.
+    let dotted = trimmed.replace('/', ".");
+    format!("\"{}\"", dotted)
+}
+
+/// Split a string by top-level commas (not inside brackets or strings).
+fn split_top_level_commas(s: &str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut bracket_depth = 0i32;
+    let mut in_str = false;
+
+    for c in s.chars() {
+        if in_str {
+            current.push(c);
+            if c == '"' {
+                in_str = false;
+            }
+        } else if c == '"' {
+            in_str = true;
+            current.push(c);
+        } else if c == '[' || c == '(' {
+            bracket_depth += 1;
+            current.push(c);
+        } else if c == ']' || c == ')' {
+            bracket_depth -= 1;
+            current.push(c);
+        } else if c == ',' && bracket_depth == 0 {
+            parts.push(current.clone());
+            current.clear();
+        } else {
+            current.push(c);
+        }
+    }
+    parts.push(current);
+    parts
+}
+
 /// Wrap a bare page-body (no fn signature) in `pub fn page_token() -> impl IntoToken`.
 /// If the file already contains `fn page_token`, pass through unchanged.
 fn wrap_page_fn(content: &str) -> String {
@@ -551,8 +1070,8 @@ mod tests {
     btn("Click")
 "#;
         let out = preprocess_token_dsl(input);
-        assert!(out.contains(".child(text(\"hello\"))"));
-        assert!(out.contains(".child(btn(\"Click\"))"));
+        assert!(out.contains(".add(text(\"hello\"))"));
+        assert!(out.contains(".add(btn(\"Click\"))"));
     }
 
     #[test]
@@ -564,7 +1083,7 @@ mod tests {
 "#;
         let out = preprocess_token_dsl(input);
         assert!(out.contains(".row()"));
-        assert!(out.contains(".child(text(\"nested\"))"));
+        assert!(out.contains(".add(text(\"nested\"))"));
         assert!(out.contains(".end()"));
     }
 
@@ -580,7 +1099,7 @@ mod tests {
         assert!(out.contains("col()"));
         assert!(out.contains(".block()"));
         assert!(out.contains(".row()"));
-        assert!(out.contains(".child(text(\"deep\"))"));
+        assert!(out.contains(".add(text(\"deep\"))"));
         let ends: Vec<_> = out.lines().filter(|l| l.trim() == ".end()").collect();
         assert_eq!(ends.len(), 2);
     }
@@ -588,7 +1107,7 @@ mod tests {
     #[test]
     fn test_child_parens_untouched() {
         let input = r#"col()
-    .child(
+    .add(
         text("hello")
     )
 "#;
@@ -609,8 +1128,8 @@ mod tests {
 "#;
         let out = preprocess_token_dsl(input);
         assert!(out.contains(".row()"));
-        assert!(out.contains(".child(text(\"Hello\"))"));
-        assert!(out.contains(".child(btn(\"Click\"))"));
+        assert!(out.contains(".add(text(\"Hello\"))"));
+        assert!(out.contains(".add(btn(\"Click\"))"));
         assert!(out.contains(".end()"));
     }
 
@@ -648,7 +1167,7 @@ mod tests {
     #[test]
     fn test_multiline_child_call() {
         let input = r#"col()
-    .child(
+    .add(
         text("line1")
             .bold()
     )
@@ -657,7 +1176,7 @@ mod tests {
         let out = preprocess_token_dsl(input);
         assert!(out.contains("        text(\"line1\")"));
         assert!(out.contains(".bold()"));
-        assert!(out.contains(".child(text(\"outside\"))"));
+        assert!(out.contains(".add(text(\"outside\"))"));
     }
 
     #[test]
@@ -667,7 +1186,7 @@ mod tests {
         .bold()
 "#;
         let out = preprocess_token_dsl(input);
-        assert!(out.contains(".child(text(\"He said \\\"Hello\\\"\"))"));
+        assert!(out.contains(".add(text(\"He said \\\"Hello\\\"\"))"));
     }
 
     #[test]
@@ -691,11 +1210,11 @@ mod tests {
 "#;
         let out = preprocess_token_dsl(input);
         assert!(out.contains(".row()"));
-        assert!(out.contains(".child(text(\"Hello\"))"));
-        assert!(out.contains(".child(btn(\"Click\"))"));
+        assert!(out.contains(".add(text(\"Hello\"))"));
+        assert!(out.contains(".add(btn(\"Click\"))"));
         assert!(out.contains(".col()"));
         assert!(out.contains(".block()"));
-        assert!(out.contains(".child(text(\"Deep\"))"));
+        assert!(out.contains(".add(text(\"Deep\"))"));
     }
 
     // ── New bare-modifier syntax tests ────────────────────────────────────
@@ -774,8 +1293,8 @@ mod tests {
         assert!(out.contains(".row()"));
         assert!(out.contains(".block()"));
         // text A is child of row, text B is child of block
-        assert!(out.contains(".child(text(\"A\"))"));
-        assert!(out.contains(".child(text(\"B\"))"));
+        assert!(out.contains(".add(text(\"A\"))"));
+        assert!(out.contains(".add(text(\"B\"))"));
         // two .end() calls for row and block
         let ends: Vec<_> = out.lines().filter(|l| l.trim() == ".end()").collect();
         assert_eq!(ends.len(), 2, "Expected 2 .end() calls, got: {}", out);
@@ -869,7 +1388,8 @@ fn main() {
                                 for (file_str, file_path) in &rs_files {
                                     let module_name = file_str.trim_end_matches(".rs");
                                     let raw = fs::read_to_string(file_path).unwrap();
-                                    let content = rewrite_vec_literals(&wrap_page_fn(&raw));
+                                    let content = normalize_bare_syntax(&wrap_page_fn(&raw));
+                                    let content = rewrite_vec_literals(&content);
 
                                     // 1. Auto-insert .end() calls based on indentation
                                     let preprocessed = preprocess_token_dsl(&content);
@@ -942,7 +1462,8 @@ fn main() {
                                 
                                 // Read, preprocess, fix imports, and write to output directory
                                 let raw = fs::read_to_string(&path).unwrap();
-                                let content = rewrite_vec_literals(&wrap_page_fn(&raw));
+                                let content = normalize_bare_syntax(&wrap_page_fn(&raw));
+                                let content = rewrite_vec_literals(&content);
 
                                 // 1. Auto-insert .end() calls based on indentation
                                 let preprocessed = preprocess_token_dsl(&content);

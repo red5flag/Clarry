@@ -178,7 +178,7 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Raw CSS / Tailwind Classes ────────────────────────────────────────
-    fn css(mut self, extra: impl Into<Str>) -> Self {
+    fn set_class(mut self, extra: impl Into<Str>) -> Self {
         let extra_str = extra.into();
         self.node_mut().class = extra_str;
         self.node_mut().style_mode = StyleMode::Class;
@@ -294,7 +294,7 @@ pub trait TokenBuilder: Sized + IntoToken {
     }
 
     // ── Declarative actions ───────────────────────────────────────────────
-    fn act(mut self, action: impl Into<TokenAction>) -> Self {
+    fn push_action(mut self, action: impl Into<TokenAction>) -> Self {
         self.node_mut().actions.push(action.into()); self
     }
     fn acts(mut self, actions: Vec<TokenAction>) -> Self {
@@ -307,132 +307,132 @@ pub trait TokenBuilder: Sized + IntoToken {
         self.append_css("cursor:pointer;").on_action(TokenAction::Chain(actions))
     }
     fn log(self, msg: impl Into<Str>) -> Self {
-        self.act(TokenAction::Log { level: LogLevel::Info, message: msg.into() })
+        self.push_action(TokenAction::Log { level: LogLevel::Info, message: msg.into() })
     }
     fn open_modal(self, id: impl Into<Str>) -> Self {
         let id_str = id.into();
-        self.act(TokenAction::Show { show: id_str, hide: vec![] }).log("🪟 modal opened")
+        self.push_action(TokenAction::Show { show: id_str, hide: vec![] }).log("🪟 modal opened")
     }
     fn close_modal(self) -> Self {
-        self.act(TokenAction::HideAllModals).log("✕ modal closed")
+        self.push_action(TokenAction::HideAllModals).log("✕ modal closed")
     }
     fn trigger_upload(self, accept: impl Into<Str>) -> Self {
-        self.act(TokenAction::TriggerFileInput { accept: Some(accept.into()), multiple: false })
+        self.push_action(TokenAction::TriggerFileInput { accept: Some(accept.into()), multiple: false })
     }
     fn show(self, id: impl Into<Str>) -> Self {
-        self.act(TokenAction::Show { show: id.into(), hide: vec![] })
+        self.push_action(TokenAction::Show { show: id.into(), hide: vec![] })
     }
     fn hide_el(self, id: impl Into<Str>) -> Self {
-        self.act(TokenAction::Hide(id.into()))
+        self.push_action(TokenAction::Hide(id.into()))
     }
     fn toggle_class_act(self, target: impl Into<Str>, class: impl Into<Str>) -> Self {
-        self.act(TokenAction::ToggleClass { target: target.into(), class: class.into() })
+        self.push_action(TokenAction::ToggleClass { target: target.into(), class: class.into() })
     }
     fn scroll_to(self, target: impl Into<Str>) -> Self {
-        self.act(TokenAction::ScrollTo { target: target.into(), behavior: ScrollBehavior::Smooth })
+        self.push_action(TokenAction::ScrollTo { target: target.into(), behavior: ScrollBehavior::Smooth })
     }
     fn copy(self, text: impl Into<Str>) -> Self {
-        self.act(TokenAction::CopyToClipboard(text.into()))
+        self.push_action(TokenAction::CopyToClipboard(text.into()))
     }
     fn open_url(self, url: impl Into<Str>) -> Self {
-        self.act(TokenAction::OpenUrl { url: url.into(), new_tab: false })
+        self.push_action(TokenAction::OpenUrl { url: url.into(), new_tab: false })
     }
     fn navigate(self, page: impl Into<Str>) -> Self {
-        self.act(TokenAction::Navigate(page.into()))
+        self.push_action(TokenAction::Navigate(page.into()))
     }
 
     // ── Storage shortcuts ─────────────────────────────────────────────────
     fn store_set(self, key: impl Into<Str>, val: impl Into<Str>) -> Self {
-        self.act(TokenAction::StoreSet {
+        self.push_action(TokenAction::StoreSet {
             key: key.into(),
             value: val.into(),
         })
     }
     fn store_get(self, key: impl Into<Str>, target: DataTarget) -> Self {
-        self.act(TokenAction::StoreGet {
+        self.push_action(TokenAction::StoreGet {
             key: key.into(), target,
         })
     }
     fn store_delete(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::StoreDelete {
+        self.push_action(TokenAction::StoreDelete {
             key: key.into(),
         })
     }
     fn increment(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::Increment { key: key.into(), by: 1 })
+        self.push_action(TokenAction::Increment { key: key.into(), by: 1 })
     }
     fn decrement(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::Decrement { key: key.into(), by: 1 })
+        self.push_action(TokenAction::Decrement { key: key.into(), by: 1 })
     }
     // Short aliases for common state mutations
     fn inc(self, key: impl Into<Str>) -> Self { self.increment(key) }
     fn dec(self, key: impl Into<Str>) -> Self { self.decrement(key) }
     fn toggle(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::ToggleState { key: key.into(), on_state: "true".into(), off_state: "false".into() })
+        self.push_action(TokenAction::ToggleState { key: key.into(), on_state: "true".into(), off_state: "false".into() })
     }
     fn toggle_state(self, key: impl Into<Str>, on: impl Into<Str>, off: impl Into<Str>) -> Self {
-        self.act(TokenAction::ToggleState { key: key.into(), on_state: on.into(), off_state: off.into() })
+        self.push_action(TokenAction::ToggleState { key: key.into(), on_state: on.into(), off_state: off.into() })
     }
     fn tog(self, key: impl Into<Str>) -> Self { self.toggle(key) }
     fn cyc(self, key: impl Into<Str>, states: Vec<impl Into<Str>>) -> Self { self.cycle(key, states) }
     fn cycle(self, key: impl Into<Str>, states: Vec<impl Into<Str>>) -> Self {
         let states: Vec<Str> = states.into_iter().map(|s| s.into()).collect();
-        self.act(TokenAction::Custom(format!("cycle:{}:{}", key.into(), states.join(",")).into()))
+        self.push_action(TokenAction::Custom(format!("cycle:{}:{}", key.into(), states.join(",")).into()))
     }
     fn store_set_ttl(self, key: impl Into<Str>, val: impl Into<Str>, ttl_seconds: u64) -> Self {
-        self.act(TokenAction::StoreSetTtl { key: key.into(), value: val.into(), ttl_seconds })
+        self.push_action(TokenAction::StoreSetTtl { key: key.into(), value: val.into(), ttl_seconds })
     }
     fn preload(self, key: impl Into<Str>, endpoint: impl Into<Str>) -> Self {
-        self.act(TokenAction::Preload { key: key.into(), endpoint: endpoint.into() })
+        self.push_action(TokenAction::Preload { key: key.into(), endpoint: endpoint.into() })
     }
     fn store_watch(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::Watch { key: key.into() })
+        self.push_action(TokenAction::Watch { key: key.into() })
     }
 
     // ── System control ────────────────────────────────────────────────────
     fn fullscreen(self) -> Self {
-        self.act(TokenAction::RequestFullscreen)
+        self.push_action(TokenAction::RequestFullscreen)
     }
     fn exit_fullscreen(self) -> Self {
-        self.act(TokenAction::ExitFullscreen)
+        self.push_action(TokenAction::ExitFullscreen)
     }
     fn pointer_lock(self) -> Self {
-        self.act(TokenAction::RequestPointerLock)
+        self.push_action(TokenAction::RequestPointerLock)
     }
     fn vibrate(self, pattern: Vec<u32>) -> Self {
-        self.act(TokenAction::Vibrate { pattern })
+        self.push_action(TokenAction::Vibrate { pattern })
     }
     fn notify(self, title: impl Into<Str>, body: impl Into<Str>) -> Self {
-        self.act(TokenAction::Notify { title: title.into(), body: body.into(), icon: None })
+        self.push_action(TokenAction::Notify { title: title.into(), body: body.into(), icon: None })
     }
     fn notify_with_icon(self, title: impl Into<Str>, body: impl Into<Str>, icon: impl Into<Str>) -> Self {
-        self.act(TokenAction::Notify { title: title.into(), body: body.into(), icon: Some(icon.into()) })
+        self.push_action(TokenAction::Notify { title: title.into(), body: body.into(), icon: Some(icon.into()) })
     }
     fn share(self, title: impl Into<Str>, text: impl Into<Str>) -> Self {
-        self.act(TokenAction::Share { title: title.into(), text: text.into(), url: None })
+        self.push_action(TokenAction::Share { title: title.into(), text: text.into(), url: None })
     }
     fn share_url(self, title: impl Into<Str>, text: impl Into<Str>, url: impl Into<Str>) -> Self {
-        self.act(TokenAction::Share { title: title.into(), text: text.into(), url: Some(url.into()) })
+        self.push_action(TokenAction::Share { title: title.into(), text: text.into(), url: Some(url.into()) })
     }
 
     // ── Drawer helpers ────────────────────────────────────────────────────
     fn toggle_drawer(self, id: impl Into<Str>) -> Self {
-        self.act(TokenAction::Custom(format!("toggle_drawer:{}", id.into()).into()))
+        self.push_action(TokenAction::Custom(format!("toggle_drawer:{}", id.into()).into()))
     }
     fn cycle_drawer(self, ids: Vec<impl Into<Str>>) -> Self {
         let ids: Vec<String> = ids.into_iter().map(|s| s.into().to_string()).collect();
-        self.act(TokenAction::Custom(format!("cycle_drawer:{}", ids.join(",")).into()))
+        self.push_action(TokenAction::Custom(format!("cycle_drawer:{}", ids.join(",")).into()))
     }
 
     // ── File storage (dot-notation paths) ─────────────────────────────────
     fn file_store_set(self, key: impl Into<Str>, _val: impl Into<Str>) -> Self {
-        self.act(TokenAction::Custom(format!("file_store_set:{}", key.into()).into()))
+        self.push_action(TokenAction::Custom(format!("file_store_set:{}", key.into()).into()))
     }
     fn file_store_get(self, key: impl Into<Str>, _target: DataTarget) -> Self {
-        self.act(TokenAction::Custom(format!("file_store_get:{}", key.into()).into()))
+        self.push_action(TokenAction::Custom(format!("file_store_get:{}", key.into()).into()))
     }
     fn file_store_delete(self, key: impl Into<Str>) -> Self {
-        self.act(TokenAction::Custom(format!("file_store_delete:{}", key.into()).into()))
+        self.push_action(TokenAction::Custom(format!("file_store_delete:{}", key.into()).into()))
     }
 
     // ── Variant / size / state ────────────────────────────────────────────
@@ -463,7 +463,7 @@ pub trait TokenBuilder: Sized + IntoToken {
         self
     }
     fn inf(self, endpoint: impl Into<Str>) -> Self {
-        self.act(TokenAction::Custom(format!("inf:{}", endpoint.into()).into()))
+        self.push_action(TokenAction::Custom(format!("inf:{}", endpoint.into()).into()))
     }
 
     // ── List rendering ────────────────────────────────────────────────────
@@ -488,7 +488,7 @@ pub trait TokenBuilder: Sized + IntoToken {
         self.append_css(format!("--tok-form-id:{};", id.into()))
     }
     fn on_submit(self, handler_name: impl Into<Str>) -> Self {
-        self.act(TokenAction::Submit {
+        self.push_action(TokenAction::Submit {
             form_id:    "".into(),
             on_submit:  handler_name.into(),
             on_invalid: None,
@@ -597,12 +597,12 @@ pub trait TokenBuilder: Sized + IntoToken {
     // ── Navigation ─────────────────────────────────────────────────────────
     fn open_url_new_tab(self, url: impl Into<Str>) -> Self {
         let url_str = url.into();
-        self.act(TokenAction::OpenUrl { url: url_str, new_tab: true })
+        self.push_action(TokenAction::OpenUrl { url: url_str, new_tab: true })
     }
 
     fn submit_form(self, form_id: impl Into<Str>) -> Self {
         let id = form_id.into();
-        self.act(TokenAction::Submit { form_id: id, on_submit: "handle_form_submit".into(), on_invalid: None })
+        self.push_action(TokenAction::Submit { form_id: id, on_submit: "handle_form_submit".into(), on_invalid: None })
     }
 
     // ── Fluent English-like API for non-programmers ─────────────────────────
@@ -706,10 +706,10 @@ pub trait TokenBuilder: Sized + IntoToken {
 
     // ── Conditional visibility ────────────────────────────────────────────
     fn show_when(self, id: impl Into<Str>) -> Self {
-        self.act(TokenAction::Show { show: id.into(), hide: vec![] })
+        self.push_action(TokenAction::Show { show: id.into(), hide: vec![] })
     }
     fn hide_when(self, id: impl Into<Str>) -> Self {
-        self.act(TokenAction::Hide(id.into()))
+        self.push_action(TokenAction::Hide(id.into()))
     }
 
     // ── Content helpers ───────────────────────────────────────────────────

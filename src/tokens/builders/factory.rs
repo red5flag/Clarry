@@ -444,17 +444,20 @@ pub fn chat_bubble_messages(storage_root: impl Into<String>) -> Block {
 }
 
 /// Render a JSON array from a storage path as a `<ul>` list of `field` values.
-/// Re-renders whenever the storage path is updated.
+/// Each item has a ✓ (tick) button that highlights it green, and a ✗ (x) button
+/// that removes it from the array. Re-renders whenever the storage path is updated.
 pub fn json_list(path: impl Into<String>, field: impl Into<String>) -> Block {
     use leptos::prelude::*;
     use crate::tokens::reactive::TokenCtx;
     use crate::tokens::storage::primitive::Store;
     use serde_json::Value;
+    use std::collections::HashSet;
     let path = path.into();
     let field = field.into();
+    let ticked: RwSignal<HashSet<String>> = RwSignal::new(HashSet::new());
     let mut n = TokenNode::new(next_id());
     n.tag = "ul".into();
-    n.class = "list-disc pl-5 space-y-1".into();
+    n.class = "space-y-1".into();
     n.dynamic_content = Some(Arc::new(move || {
         let raw = use_context::<TokenCtx>()
             .map(|ctx| {
@@ -467,9 +470,64 @@ pub fn json_list(path: impl Into<String>, field: impl Into<String>) -> Block {
         let items: Vec<Value> = serde_json::from_str(&raw).unwrap_or_default();
         let rows = items.into_iter().map(|item| {
             let text = item.get(&field).and_then(|v| v.as_str()).unwrap_or("").to_string();
-            view! { <li class="text-sm">{text}</li> }
+            let text_c = text.clone();
+            let text_tick = text.clone();
+            let text_rm = text.clone();
+            let field_c = field.clone();
+            let path_c = path.clone();
+            let ticked_c = ticked;
+            view! {
+                <li class=move || if ticked_c.get().contains(text_c.as_str()) {
+                    "flex items-center gap-2 px-2 py-1 rounded bg-green-100 border border-green-300"
+                } else {
+                    "flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50"
+                }>
+                    <button
+                        class="text-green-600 hover:text-green-800 font-bold text-sm w-5 flex-shrink-0"
+                        on:click=move |_| {
+                            ticked_c.update(|s| {
+                                if s.contains(text_tick.as_str()) {
+                                    s.remove(text_tick.as_str());
+                                } else {
+                                    s.insert(text_tick.clone());
+                                }
+                            });
+                        }
+                    >"✓"</button>
+                    <span class="text-sm flex-1">{text}</span>
+                    <button
+                        class="text-red-500 hover:text-red-700 font-bold text-sm w-5 flex-shrink-0"
+                        on:click=move |_| {
+                            let arr_json = use_context::<TokenCtx>()
+                                .and_then(|ctx| {
+                                    ctx.strings.get().get(&path_c).cloned()
+                                        .filter(|s| !s.is_empty())
+                                        .or_else(|| Store::read(&path_c))
+                                })
+                                .unwrap_or_else(|| "[]".to_string());
+                            let mut arr: Vec<serde_json::Value> = serde_json::from_str(&arr_json).unwrap_or_default();
+                            let mut removed = false;
+                            arr.retain(|item| {
+                                if !removed && item.get(&field_c).and_then(|v| v.as_str()) == Some(&text_rm) {
+                                    removed = true;
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                            let new_json = serde_json::to_string(&arr).unwrap_or_default();
+                            Store::write(&path_c, &new_json);
+                            if let Some(ctx) = use_context::<TokenCtx>() {
+                                ctx.set_string(&path_c, new_json);
+                                ctx.bump_list_rev();
+                            }
+                            ticked_c.update(|s| { s.remove(text_rm.as_str()); });
+                        }
+                    >"✗"</button>
+                </li>
+            }
         }).collect::<Vec<_>>();
-        view! { <ul class="list-disc pl-5 space-y-1">{rows}</ul> }.into_any()
+        view! { <ul class="space-y-1">{rows}</ul> }.into_any()
     }));
     Container { stack: vec![n] }
 }

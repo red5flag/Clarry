@@ -2,251 +2,266 @@ use crate::data::app_data::seed_instagram_storage;
 use crate::tokens::storage::primitive::Store;
 if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
-col()
-        id("instagram_home_page")
-        css("min-h-screen bg-black text-white pb-20 max-w-lg mx-auto")
+col
+        id instagram_home_page
+        css min-h-screen bg-black text-white pb-20 max-w-lg mx-auto
 
-        row()
-            css("sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between")
-            txt("Instagram")
-                css("text-xl font-bold tracking-tight italic")
-            row()
-                css("gap-4 items-center")
-                btn("♡")
-                    var("ghost")
-                    css("text-2xl")
-                    nav("instagram_notifications")
-                btn("✉")
-                    var("ghost")
-                    css("text-2xl")
-                    nav("instagram_messages")
+        row
+            css sticky top-0 z-50 bg-black border-b border-gray-800 px-4 py-3 items-center justify-between
+            txt "Instagram"
+                css text-xl font-bold tracking-tight italic
+            row
+                css gap-4 items-center
+                btn "♡"
+                    var ghost
+                    css text-2xl
+                    act nav instagram_notifications
+                btn "✉"
+                    var ghost
+                    css text-2xl
+                    act nav instagram_messages
 
-        row()
-            css("px-4 py-3 gap-4 overflow-x-auto scrollbar-none border-b border-gray-800")
-            col()
-                css("items-center gap-1 min-w-[64px] cursor-pointer")
-                block()
-                    css("w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0")
-                    img_block("https://i.pravatar.cc/150?u=me")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                txt("Your Story")
-                    css("text-xs text-gray-300 truncate text-center")
-            col()
-                css("items-center gap-1 min-w-[64px] cursor-pointer")
-                acts(vec![store_set("ig.viewing.story_id", "bob"), store_set("ig.story.slide_index", "0"), navigate("instagram_story")])
-                block()
-                    css("w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0")
-                    img_block("https://i.pravatar.cc/150?u=bob")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                txt("Bob")
-                    css("text-xs text-gray-300 truncate text-center")
-            col()
-                css("items-center gap-1 min-w-[64px] cursor-pointer")
-                acts(vec![store_set("ig.viewing.story_id", "charlie"), store_set("ig.story.slide_index", "0"), navigate("instagram_story")])
-                block()
-                    css("w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0")
-                    img_block("https://i.pravatar.cc/150?u=charlie")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                txt("Charlie")
-                    css("text-xs text-gray-300 truncate text-center")
-            col()
-                css("items-center gap-1 min-w-[64px] cursor-pointer")
-                acts(vec![store_set("ig.viewing.story_id", "diana"), store_set("ig.story.slide_index", "0"), navigate("instagram_story")])
-                block()
-                    css("w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0")
-                    img_block("https://i.pravatar.cc/150?u=diana")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                txt("Diana")
-                    css("text-xs text-gray-300 truncate text-center")
+        row
+            css px-4 py-3 gap-4 overflow-x-auto scrollbar-none border-b border-gray-800
+            col
+                css items-center gap-1 min-w-[64px] cursor-pointer
+                block
+                    css w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0
+                    img_block "https://i.pravatar.cc/150?u=me"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                txt "Your Story"
+                    css text-xs text-gray-300 truncate text-center
+            col
+                css items-center gap-1 min-w-[64px] cursor-pointer
+                act store_set ig/viewing/story_id, bob
+                act store_set ig/story/slide_index, "0"
+                act nav instagram_story
+                block
+                    css w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0
+                    img_block "https://i.pravatar.cc/150?u=bob"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                txt "Bob"
+                    css text-xs text-gray-300 truncate text-center
+            col
+                css items-center gap-1 min-w-[64px] cursor-pointer
+                act store_set ig/viewing/story_id, charlie
+                act store_set ig/story/slide_index, "0"
+                act nav instagram_story
+                block
+                    css w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0
+                    img_block "https://i.pravatar.cc/150?u=charlie"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                txt "Charlie"
+                    css text-xs text-gray-300 truncate text-center
+            col
+                css items-center gap-1 min-w-[64px] cursor-pointer
+                act store_set ig/viewing/story_id, diana
+                act store_set ig/story/slide_index, "0"
+                act nav instagram_story
+                block
+                    css w-14 h-14 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0
+                    img_block "https://i.pravatar.cc/150?u=diana"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                txt "Diana"
+                    css text-xs text-gray-300 truncate text-center
 
-        col()
-            css("border-b border-gray-800")
-            row()
-                css("px-4 py-2.5 gap-3 items-center")
-                block()
-                    css("w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer")
-                    acts(vec![store_set("ig.viewing.user_id", "bob"), navigate("instagram_profile")])
-                    img_block("https://i.pravatar.cc/150?u=bob")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                col()
-                    css("flex-1 gap-0")
-                    txt("Bob Smith")
-                        css("text-sm font-semibold")
-                    txt("@bob")
-                        css("text-xs text-gray-500")
-                btn("•••")
-                    var("ghost")
-                    css("text-gray-500 text-lg p-0")
-            block()
-                css("w-full bg-gray-900 overflow-hidden cursor-pointer")
-                acts(vec![store_set("ig.viewing.post_id", "p_bob_1"), navigate("instagram_post")])
-                img_block("https://picsum.photos/600/600?random=10")
-                    css("w-full aspect-square object-cover block")
-            row()
-                css("px-4 pt-3 pb-1 gap-4 items-center")
-                btn("♡")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.liked.p_bob_1"))
-                btn("💬")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    acts(vec![store_set("ig.viewing.post_id", "p_bob_1"), navigate("instagram_post")])
-                btn("✈")
-                    var("ghost")
-                    css("text-2xl p-0")
-                block()
-                    css("flex-1")
-                btn("🔖")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.saved.p_bob_1"))
-            col()
-                css("px-4 pb-3 gap-0.5")
-                txt("2.4K likes")
-                    css("text-sm font-semibold")
-                row()
-                    css("gap-1.5 flex-wrap items-baseline")
-                    txt("Bob Smith")
-                        css("text-sm font-semibold")
-                    txt("Golden hour at the harbor 🌅")
-                        css("text-sm text-gray-200 line-clamp-2")
-                txt("2h ago")
-                    css("text-xs text-gray-600 uppercase tracking-wide mt-0.5")
+        col
+            css border-b border-gray-800
+            row
+                css px-4 py-2.5 gap-3 items-center
+                block
+                    css w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer
+                    act store_set ig/viewing/user_id, bob
+                    act nav instagram_profile
+                    img_block "https://i.pravatar.cc/150?u=bob"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                col
+                    css flex-1 gap-0
+                    txt "Bob Smith"
+                        css text-sm font-semibold
+                    txt "@bob"
+                        css text-xs text-gray-500
+                btn "•••"
+                    var ghost
+                    css text-gray-500 text-lg p-0
+            block
+                css w-full bg-gray-900 overflow-hidden cursor-pointer
+                act store_set ig/viewing/post_id, p_bob_1
+                act nav instagram_post
+                img_block "https://picsum.photos/600/600?random=10"
+                    css w-full aspect-square object-cover block
+            row
+                css px-4 pt-3 pb-1 gap-4 items-center
+                btn "♡"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/liked/p_bob_1
+                btn "💬"
+                    var ghost
+                    css text-2xl p-0
+                    act store_set ig/viewing/post_id, p_bob_1
+                    act nav instagram_post
+                btn "✈"
+                    var ghost
+                    css text-2xl p-0
+                block
+                    css flex-1
+                btn "🔖"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/saved/p_bob_1
+            col
+                css px-4 pb-3 gap-0.5
+                txt "2.4K likes"
+                    css text-sm font-semibold
+                row
+                    css gap-1.5 flex-wrap items-baseline
+                    txt "Bob Smith"
+                        css text-sm font-semibold
+                    txt "Golden hour at the harbor 🌅"
+                        css text-sm text-gray-200 line-clamp-2
+                txt "2h ago"
+                    css text-xs text-gray-600 uppercase tracking-wide mt-0.5
 
-        col()
-            css("border-b border-gray-800")
-            row()
-                css("px-4 py-2.5 gap-3 items-center")
-                block()
-                    css("w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer")
-                    acts(vec![store_set("ig.viewing.user_id", "diana"), navigate("instagram_profile")])
-                    img_block("https://i.pravatar.cc/150?u=diana")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                col()
-                    css("flex-1 gap-0")
-                    txt("Diana Prince")
-                        css("text-sm font-semibold")
-                    txt("@diana")
-                        css("text-xs text-gray-500")
-                btn("•••")
-                    var("ghost")
-                    css("text-gray-500 text-lg p-0")
-            block()
-                css("w-full bg-gray-900 overflow-hidden cursor-pointer")
-                acts(vec![store_set("ig.viewing.post_id", "p_diana_1"), navigate("instagram_post")])
-                img_block("https://picsum.photos/600/600?random=20")
-                    css("w-full aspect-square object-cover block")
-            row()
-                css("px-4 pt-3 pb-1 gap-4 items-center")
-                btn("♡")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.liked.p_diana_1"))
-                btn("💬")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    acts(vec![store_set("ig.viewing.post_id", "p_diana_1"), navigate("instagram_post")])
-                btn("✈")
-                    var("ghost")
-                    css("text-2xl p-0")
-                block()
-                    css("flex-1")
-                btn("🔖")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.saved.p_diana_1"))
-            col()
-                css("px-4 pb-3 gap-0.5")
-                txt("5.1K likes")
-                    css("text-sm font-semibold")
-                row()
-                    css("gap-1.5 flex-wrap items-baseline")
-                    txt("Diana Prince")
-                        css("text-sm font-semibold")
-                    txt("Studio vibes today 🎨✨")
-                        css("text-sm text-gray-200 line-clamp-2")
-                txt("5h ago")
-                    css("text-xs text-gray-600 uppercase tracking-wide mt-0.5")
+        col
+            css border-b border-gray-800
+            row
+                css px-4 py-2.5 gap-3 items-center
+                block
+                    css w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer
+                    act store_set ig/viewing/user_id, diana
+                    act nav instagram_profile
+                    img_block "https://i.pravatar.cc/150?u=diana"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                col
+                    css flex-1 gap-0
+                    txt "Diana Prince"
+                        css text-sm font-semibold
+                    txt "@diana"
+                        css text-xs text-gray-500
+                btn "•••"
+                    var ghost
+                    css text-gray-500 text-lg p-0
+            block
+                css w-full bg-gray-900 overflow-hidden cursor-pointer
+                act store_set ig/viewing/post_id, p_diana_1
+                act nav instagram_post
+                img_block "https://picsum.photos/600/600?random=20"
+                    css w-full aspect-square object-cover block
+            row
+                css px-4 pt-3 pb-1 gap-4 items-center
+                btn "♡"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/liked/p_diana_1
+                btn "💬"
+                    var ghost
+                    css text-2xl p-0
+                    act store_set ig/viewing/post_id, p_diana_1
+                    act nav instagram_post
+                btn "✈"
+                    var ghost
+                    css text-2xl p-0
+                block
+                    css flex-1
+                btn "🔖"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/saved/p_diana_1
+            col
+                css px-4 pb-3 gap-0.5
+                txt "5.1K likes"
+                    css text-sm font-semibold
+                row
+                    css gap-1.5 flex-wrap items-baseline
+                    txt "Diana Prince"
+                        css text-sm font-semibold
+                    txt "Studio vibes today 🎨✨"
+                        css text-sm text-gray-200 line-clamp-2
+                txt "5h ago"
+                    css text-xs text-gray-600 uppercase tracking-wide mt-0.5
 
-        col()
-            css("border-b border-gray-800")
-            row()
-                css("px-4 py-2.5 gap-3 items-center")
-                block()
-                    css("w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer")
-                    acts(vec![store_set("ig.viewing.user_id", "charlie"), navigate("instagram_profile")])
-                    img_block("https://i.pravatar.cc/150?u=charlie")
-                        css("w-full h-full rounded-full border-2 border-black object-cover")
-                col()
-                    css("flex-1 gap-0")
-                    txt("Charlie Day")
-                        css("text-sm font-semibold")
-                    txt("@charlie")
-                        css("text-xs text-gray-500")
-                btn("•••")
-                    var("ghost")
-                    css("text-gray-500 text-lg p-0")
-            block()
-                css("w-full bg-gray-900 overflow-hidden cursor-pointer")
-                acts(vec![store_set("ig.viewing.post_id", "p_charlie_1"), navigate("instagram_post")])
-                img_block("https://picsum.photos/600/600?random=30")
-                    css("w-full aspect-square object-cover block")
-            row()
-                css("px-4 pt-3 pb-1 gap-4 items-center")
-                btn("♡")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.liked.p_charlie_1"))
-                btn("💬")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    acts(vec![store_set("ig.viewing.post_id", "p_charlie_1"), navigate("instagram_post")])
-                btn("✈")
-                    var("ghost")
-                    css("text-2xl p-0")
-                block()
-                    css("flex-1")
-                btn("🔖")
-                    var("ghost")
-                    css("text-2xl p-0")
-                    act(tog("ig.saved.p_charlie_1"))
-            col()
-                css("px-4 pb-3 gap-0.5")
-                txt("891 likes")
-                    css("text-sm font-semibold")
-                row()
-                    css("gap-1.5 flex-wrap items-baseline")
-                    txt("Charlie Day")
-                        css("text-sm font-semibold")
-                    txt("Mountain air hits different 🏔️")
-                        css("text-sm text-gray-200 line-clamp-2")
-                txt("8h ago")
-                    css("text-xs text-gray-600 uppercase tracking-wide mt-0.5")
+        col
+            css border-b border-gray-800
+            row
+                css px-4 py-2.5 gap-3 items-center
+                block
+                    css w-9 h-9 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600 flex-shrink-0 cursor-pointer
+                    act store_set ig/viewing/user_id, charlie
+                    act nav instagram_profile
+                    img_block "https://i.pravatar.cc/150?u=charlie"
+                        css w-full h-full rounded-full border-2 border-black object-cover
+                col
+                    css flex-1 gap-0
+                    txt "Charlie Day"
+                        css text-sm font-semibold
+                    txt "@charlie"
+                        css text-xs text-gray-500
+                btn "•••"
+                    var ghost
+                    css text-gray-500 text-lg p-0
+            block
+                css w-full bg-gray-900 overflow-hidden cursor-pointer
+                act store_set ig/viewing/post_id, p_charlie_1
+                act nav instagram_post
+                img_block "https://picsum.photos/600/600?random=30"
+                    css w-full aspect-square object-cover block
+            row
+                css px-4 pt-3 pb-1 gap-4 items-center
+                btn "♡"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/liked/p_charlie_1
+                btn "💬"
+                    var ghost
+                    css text-2xl p-0
+                    act store_set ig/viewing/post_id, p_charlie_1
+                    act nav instagram_post
+                btn "✈"
+                    var ghost
+                    css text-2xl p-0
+                block
+                    css flex-1
+                btn "🔖"
+                    var ghost
+                    css text-2xl p-0
+                    act tog ig/saved/p_charlie_1
+            col
+                css px-4 pb-3 gap-0.5
+                txt "891 likes"
+                    css text-sm font-semibold
+                row
+                    css gap-1.5 flex-wrap items-baseline
+                    txt "Charlie Day"
+                        css text-sm font-semibold
+                    txt "Mountain air hits different 🏔️"
+                        css text-sm text-gray-200 line-clamp-2
+                txt "8h ago"
+                    css text-xs text-gray-600 uppercase tracking-wide mt-0.5
 
-        row()
-            css("fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto")
-            btn("🏠")
-                var("ghost")
-                css("text-2xl")
-                nav("instagram_home")
-            btn("🔍")
-                var("ghost")
-                css("text-2xl opacity-60")
-                nav("instagram_explore")
-            btn("➕")
-                var("ghost")
-                css("text-2xl opacity-60")
-                nav("instagram_create")
-            btn("🎬")
-                var("ghost")
-                css("text-2xl opacity-60")
-                nav("instagram_reels")
-            btn("♡")
-                var("ghost")
-                css("text-2xl opacity-60")
-                nav("instagram_notifications")
-            btn("👤")
-                var("ghost")
-                css("text-2xl opacity-60")
-                nav("instagram")
+        row
+            css fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto
+            btn "🏠"
+                var ghost
+                css text-2xl
+                act nav instagram_home
+            btn "🔍"
+                var ghost
+                css text-2xl opacity-60
+                act nav instagram_explore
+            btn "➕"
+                var ghost
+                css text-2xl opacity-60
+                act nav instagram_create
+            btn "🎬"
+                var ghost
+                css text-2xl opacity-60
+                act nav instagram_reels
+            btn "♡"
+                var ghost
+                css text-2xl opacity-60
+                act nav instagram_notifications
+            btn "👤"
+                var ghost
+                css text-2xl opacity-60
+                act nav instagram

@@ -9,7 +9,10 @@
 //   Store::write("user.name", "Bob")     -> set a scalar
 
 use serde_json::Value;
-use super::backends::{LocalStore, MemoryStore};
+#[cfg(not(target_arch = "wasm32"))]
+use super::backends::MemoryStore;
+#[cfg(target_arch = "wasm32")]
+use super::backends::LocalStore;
 
 pub struct Store;
 

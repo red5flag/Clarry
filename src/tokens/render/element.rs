@@ -198,15 +198,15 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
     };
 
     // ── Input handler (writes typed value into ctx.strings by element id) ───
-    let id_for_input = id.clone();
+    let _id_for_input = id.clone();
     let input_handler = move |ev: leptos::ev::Event| {
-        if let Some(target) = ev.target() {
+        if let Some(_target) = ev.target() {
             #[cfg(target_arch = "wasm32")]
-            if let Ok(el) = target.dyn_into::<web_sys::HtmlInputElement>() {
+            if let Ok(el) = _target.dyn_into::<web_sys::HtmlInputElement>() {
                 let val = el.value();
-                leptos::logging::log!("[INPUT_HANDLER] id={} value={}", id_for_input, val);
+                leptos::logging::log!("[INPUT_HANDLER] id={} value={}", _id_for_input, val);
                 if let Some(ctx) = ctx_for_handler {
-                    ctx.set_string(&id_for_input, val);
+                    ctx.set_string(&_id_for_input, val);
                 }
             }
         }
