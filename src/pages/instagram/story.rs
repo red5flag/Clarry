@@ -4,7 +4,7 @@ if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
 
 col
         id instagram_story_page
-        css min-h-screen bg-black relative overflow-hidden select-none max-w-lg mx-auto
+        css min-h-screen bg-black relative overflow-hidden select-none max-w-lg mx-auto lg:max-w-6xl
 
         block
             css absolute inset-0 z-0

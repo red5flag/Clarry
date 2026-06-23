@@ -13,33 +13,7 @@ col
                 css text-2xl font-bold
             row
                 css gap-4
-                txt "red@fedora:~/Carly$ cargo leptos watch
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-    Blocking waiting for file lock on package cache
-   Compiling getrandom v0.2.17
-   Compiling zerocopy v0.8.52
-error: the wasm*-unknown-unknown targets are not supported by default, you may need to enable the "js" feature. For more information see: https://docs.rs/getrandom/#webassembly-support
-   --> /home/red/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/getrandom-0.2.17/src/lib.rs:346:9
-    |
-346 | /         compile_error!("the wasm*-unknown-unknown targets are not supported by \
-347 | |                         default, you may need to enable the \"js\" feature. \
-348 | |                         For more information see: \
-349 | |                         https://docs.rs/getrandom/#webassembly-support");
-    | |________________________________________________________________________^
-
-   Compiling rand_core v0.6.4========> ] 307/318: getrandom, zerocopy(build.rs)                                                                               
-error: could not compile `getrandom` (lib) due to 1 previous error
-warning: build failed, waiting for other jobs to finish...
-   Compiling password-hash v0.5.0
-   Compiling rand_chacha v0.3.1
-   Compiling rand v0.8.6
-   Compiling argon2 v0.5.3
-   Compiling farley v0.1.0 (/home/red/Carly)
-    Building [=======================> ] 450/451: farley(bin)                                                                                                 🔔"
+                txt "User"
                     css text-xl
                 img_block "https://i.pravatar.cc/150?u=me"
                     css w-8 h-8 rounded-full

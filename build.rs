@@ -611,15 +611,17 @@ fn rewrite_vec_literals(content: &str) -> String {
             continue;
         }
 
-        // `[` — rewrite to `vec![` unless preceded by `vec!` or `]` (index expr)
+        // `[` — rewrite to `vec![` unless preceded by `vec!`, `#` (attribute), or `]` (index expr)
         if c == '[' {
-            let preceded_by_vec = out.trim_end().ends_with("vec!");
+            let trimmed = out.trim_end();
+            let preceded_by_vec = trimmed.ends_with("vec!");
+            let preceded_by_hash = trimmed.ends_with('#');
             // Also skip if it looks like an index: preceded by ident char or `]` or `)`
-            let last_non_ws = out.trim_end().chars().last();
+            let last_non_ws = trimmed.chars().last();
             let is_index = matches!(last_non_ws,
                 Some(ch) if ch == ']' || ch == ')' || ch.is_alphanumeric() || ch == '_'
             );
-            if preceded_by_vec || is_index {
+            if preceded_by_vec || preceded_by_hash || is_index {
                 out.push('[');
             } else {
                 out.push_str("vec![");

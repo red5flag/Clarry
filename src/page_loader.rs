@@ -94,7 +94,6 @@ pub fn init_page_loader() {
     register_token_page("demo", crate::pages::demo::page_token);
     register_token_page("instagram",                  crate::pages::instagram::page_token);
     register_token_page("instagram_home",             crate::pages::instagram::home::page_token);
-    register_token_page("instagram_edit",             crate::pages::instagram::edit::page_token);
     register_token_page("instagram_create",           crate::pages::instagram::create::page_token);
     register_token_page("instagram_profile",          crate::pages::instagram::profile::page_token);
     register_token_page("instagram_post",             crate::pages::instagram::post::page_token);

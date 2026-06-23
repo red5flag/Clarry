@@ -311,6 +311,7 @@ pub fn text_read(path: impl Into<String>) -> Text {
 pub fn img_bind(key: impl Into<String>, fallback: impl Into<Str>) -> Block {
     use leptos::prelude::*;
     use crate::tokens::reactive::TokenCtx;
+    use crate::tokens::storage::primitive::Store;
     let key = key.into();
     let fallback = fallback.into().to_string();
     let mut n = TokenNode::new(next_id());
@@ -318,8 +319,14 @@ pub fn img_bind(key: impl Into<String>, fallback: impl Into<Str>) -> Block {
     n.class = "w-full h-auto object-cover rounded-lg".into();
     n.dynamic_content = Some(Arc::new(move || {
         let src = use_context::<TokenCtx>()
-            .map(|ctx| ctx.string_fn(key.clone())())
-            .filter(|s| !s.is_empty())
+            .map(|ctx| {
+                let _rev = ctx.list_rev.get();
+                ctx.strings.get().get(&key).cloned()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| Store::read(&key))
+                    .filter(|s| !s.is_empty())
+                    .unwrap_or_else(|| fallback.clone())
+            })
             .unwrap_or_else(|| fallback.clone());
         let src_clone = src.clone();
         view! { <img src=src_clone class="w-full h-auto object-cover rounded-lg" alt="" /> }.into_any()
@@ -576,6 +583,49 @@ pub fn json_field(path: impl Into<String>, field: impl Into<String>) -> Text {
     })
 }
 
+/// Shared Instagram desktop sidebar navigation.
+/// Active page is highlighted; call with the active page name:
+/// home, explore, create, reels, notifications, messages, profile.
+pub fn instagram_sidebar(active: impl Into<Str>) -> Block {
+    let active = active.into().to_string();
+    let dim = "opacity-60";
+    let mut root = TokenNode::new(next_id());
+    root.tag = "div".into();
+    root.class = "hidden lg:flex fixed top-0 left-0 h-screen w-64 flex-col border-r border-gray-800 bg-black z-40 px-4 py-6 gap-6".into();
+
+    let mut logo = TokenNode::new(next_id());
+    logo.tag = "div".into();
+    logo.content = Some("Instagram".into());
+    logo.class = "text-xl font-bold italic tracking-tight px-2".into();
+    root.children.push(logo);
+
+    let mut nav = TokenNode::new(next_id());
+    nav.tag = "nav".into();
+    nav.class = "flex flex-col gap-2".into();
+
+    let items: Vec<(&str, &str, &str)> = vec![
+        ("🏠 Home", "instagram_home", "home"),
+        ("🔍 Explore", "instagram_explore", "explore"),
+        ("➕ Create", "instagram_create", "create"),
+        ("🎬 Reels", "instagram_profile", "reels"),
+        ("♡ Notifications", "instagram_notifications", "notifications"),
+        ("✉ Messages", "instagram_messages", "messages"),
+        ("👤 Profile", "instagram", "profile"),
+    ];
+
+    for (label, dest, page) in items {
+        let mut btn = TokenNode::new(next_id());
+        btn.tag = "button".into();
+        btn.content = Some(label.into());
+        btn.class = format!("w-full text-left flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-gray-900 transition-colors {}", if active == page { "font-semibold" } else { dim }).into();
+        btn.actions.push(TokenAction::Navigate(dest.into()));
+        nav.children.push(btn);
+    }
+
+    root.children.push(nav);
+    Container { stack: vec![root] }
+}
+
 // ── Extension trait for chaining actions fluently ───────────────────────────
 
 pub trait ActionChain {
@@ -593,3 +643,4 @@ impl ActionChain for TokenAction {
         }
     }
 }
+

@@ -70,6 +70,32 @@ impl TokenCtx {
                     self.visibility.update(|m| { m.insert(node.id.to_string(), false); });
                     seeded_count += 1;
                 }
+                // Seed tab visual state for panel nodes
+                if node.id.ends_with("_panel") {
+                    let stem = node.id.trim_end_matches("_panel");
+                    let tab_id = format!("{}_tab", stem);
+                    if has_hidden_class || has_display_none {
+                        // Inactive tab
+                        self.classes.update(|m| {
+                            let entry = m.entry(tab_id).or_default();
+                            entry.retain(|c| c != "border-t-2" && c != "border-white" && c != "font-semibold");
+                            if !entry.contains(&"text-gray-400".to_string()) {
+                                entry.push("text-gray-400".to_string());
+                            }
+                        });
+                    } else {
+                        // Active tab
+                        self.classes.update(|m| {
+                            let entry = m.entry(tab_id).or_default();
+                            entry.retain(|c| c != "text-gray-400");
+                            for cls in ["border-t-2", "border-white", "font-semibold"] {
+                                if !entry.contains(&cls.to_string()) {
+                                    entry.push(cls.to_string());
+                                }
+                            }
+                        });
+                    }
+                }
             }
             for child in &node.children { stack.push(child); }
         }

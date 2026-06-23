@@ -82,7 +82,7 @@ pub use builders::{
     overlay, portal, split, aspect, tooltip, drawer,
     terminal, log_view, hex_view, tree_view, shortcut,
     tab, section,
-    stack, inf, scroll_to, text_bind, txtbnd, text_read, img_bind, data_list, chat_messages, chat_bubble_messages,
+    stack, inf, instagram_sidebar, scroll_to, text_bind, txtbnd, text_read, img_bind, data_list, chat_messages, chat_bubble_messages,
     json_list, json_count, json_field,
     video, video_ambient, audio_player, audio, model_viewer, model, iframe,
     chat_bubble, chat_ui, qr_code,

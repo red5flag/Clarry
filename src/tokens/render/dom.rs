@@ -65,8 +65,8 @@ pub fn update_tab_visuals(active_tab: &str, inactive_tabs: &[&str]) {
             if let Some(el) = doc.get_element_by_id(active_tab) {
                 let class_list = el.unchecked_into::<web_sys::HtmlElement>().class_list();
                 let active_arr = web_sys::js_sys::Array::new();
-                let _ = active_arr.push(&"border-b-2".into());
-                let _ = active_arr.push(&"border-black".into());
+                let _ = active_arr.push(&"border-t-2".into());
+                let _ = active_arr.push(&"border-white".into());
                 let _ = active_arr.push(&"font-semibold".into());
                 let _ = class_list.add(&active_arr);
                 let inactive_arr = web_sys::js_sys::Array::new();
@@ -77,8 +77,8 @@ pub fn update_tab_visuals(active_tab: &str, inactive_tabs: &[&str]) {
                 if let Some(el) = doc.get_element_by_id(id) {
                     let class_list = el.unchecked_into::<web_sys::HtmlElement>().class_list();
                     let active_arr = web_sys::js_sys::Array::new();
-                    let _ = active_arr.push(&"border-b-2".into());
-                    let _ = active_arr.push(&"border-black".into());
+                    let _ = active_arr.push(&"border-t-2".into());
+                    let _ = active_arr.push(&"border-white".into());
                     let _ = active_arr.push(&"font-semibold".into());
                     let _ = class_list.remove(&active_arr);
                     let inactive_arr = web_sys::js_sys::Array::new();

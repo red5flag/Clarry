@@ -38,7 +38,7 @@ pub use crate::tokens::{
     overlay, portal, split, aspect, tooltip, drawer,
     terminal, log_view, hex_view, tree_view, shortcut,
     tab, section,
-    stack, inf,
+    stack, inf, instagram_sidebar,
     video, video_ambient, audio_player, audio, model_viewer, model, iframe,
     chat_bubble, chat_ui, qr_code,
     progress_bar, rating,
@@ -52,7 +52,7 @@ pub use crate::tokens::{
     Row, Col, Block, Btn, Text, Grid, Img,
     TokenBuilder, ActionChain,
     store,
-    counter_text, text_bind, txtbnd, text_read, chat_messages, chat_bubble_messages,
+    counter_text, text_bind, txtbnd, text_read, img_bind, chat_messages, chat_bubble_messages,
     json_list, json_count, json_field,
     // Islands
     island, style_inject, fmt_n,

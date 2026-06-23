@@ -44,6 +44,23 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                         .map(|h| format!("{}_tab", h.trim_end_matches("_panel")))
                         .collect();
                     let inactive_refs: Vec<&str> = inactive_tabs.iter().map(|s| s.as_str()).collect();
+                    // Update reactive classes so the tab styling is driven by the same signal
+                    ctx.classes.update(|m| {
+                        let active_entry = m.entry(active_tab.clone()).or_default();
+                        active_entry.retain(|c| c != "text-gray-400");
+                        for cls in ["border-t-2", "border-white", "font-semibold"] {
+                            if !active_entry.contains(&cls.to_string()) {
+                                active_entry.push(cls.to_string());
+                            }
+                        }
+                        for tab in &inactive_tabs {
+                            let inactive_entry = m.entry(tab.clone()).or_default();
+                            inactive_entry.retain(|c| c != "border-t-2" && c != "border-white" && c != "font-semibold");
+                            if !inactive_entry.contains(&"text-gray-400".to_string()) {
+                                inactive_entry.push("text-gray-400".to_string());
+                            }
+                        }
+                    });
                     #[cfg(target_arch = "wasm32")]
                     dom::update_tab_visuals(&active_tab, &inactive_refs);
                 }
