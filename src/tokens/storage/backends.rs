@@ -86,7 +86,9 @@ impl LocalStore {
             if let Some(window) = web_sys::window() {
                 if let Ok(storage) = window.local_storage() {
                     if let Some(storage) = storage {
-                        let _ = storage.set_item(key, value);
+                        if let Err(e) = storage.set_item(key, value) {
+                            leptos::logging::warn!("localStorage.setItem({}) failed: {:?}", key, e);
+                        }
                     }
                 }
             }
@@ -116,7 +118,9 @@ impl LocalStore {
             if let Some(window) = web_sys::window() {
                 if let Ok(storage) = window.local_storage() {
                     if let Some(storage) = storage {
-                        let _ = storage.delete(key);
+                        if let Err(e) = storage.delete(key) {
+                            leptos::logging::warn!("localStorage.delete({}) failed: {:?}", key, e);
+                        }
                     }
                 }
             }
@@ -133,7 +137,9 @@ impl SessionStore {
             if let Some(window) = web_sys::window() {
                 if let Ok(storage) = window.session_storage() {
                     if let Some(storage) = storage {
-                        let _ = storage.set_item(key, value);
+                        if let Err(e) = storage.set_item(key, value) {
+                            leptos::logging::warn!("sessionStorage.setItem({}) failed: {:?}", key, e);
+                        }
                     }
                 }
             }
@@ -162,7 +168,9 @@ impl SessionStore {
             if let Some(window) = web_sys::window() {
                 if let Ok(storage) = window.session_storage() {
                     if let Some(storage) = storage {
-                        let _ = storage.delete(key);
+                        if let Err(e) = storage.delete(key) {
+                            leptos::logging::warn!("sessionStorage.delete({}) failed: {:?}", key, e);
+                        }
                     }
                 }
             }

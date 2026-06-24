@@ -188,7 +188,7 @@ impl TokenArena {
     pub fn format<'a>(&'a self, args: std::fmt::Arguments<'_>) -> &'a str {
         use std::fmt::Write;
         let mut buf = bumpalo::collections::String::new_in(&self.bump);
-        let _ = buf.write_fmt(args);
+        buf.write_fmt(args).expect("TokenArena::format: write to bump-allocated buffer failed");
         buf.into_bump_str()
     }
 

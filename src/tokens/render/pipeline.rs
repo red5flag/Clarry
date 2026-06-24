@@ -310,9 +310,9 @@ fn build_views(ops: Vec<RenderOp>) -> impl IntoView {
             }
             RenderOp::Close => {
                 let children = view_stack.pop().unwrap_or_default();
-                let meta     = meta_stack.pop().unwrap();
+                let meta     = meta_stack.pop().expect("render pipeline: unbalanced Close — meta_stack empty");
                 let view     = build_div(meta, children);
-                view_stack.last_mut().unwrap().push(view);
+                view_stack.last_mut().expect("render pipeline: unbalanced Close — view_stack empty").push(view);
                 built_count += 1;
             }
         }

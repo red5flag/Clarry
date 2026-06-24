@@ -162,7 +162,7 @@ fn write_path(val: &mut Value, segments: &[&str], value: &str) {
                 obj.insert(seg.to_string(), Value::Object(serde_json::Map::new()));
             }
         }
-        let child = obj.get_mut(seg).unwrap();
+        let child = obj.get_mut(seg).expect("write_path: key missing immediately after insert");
         write_path(child, &segments[1..], value);
     }
 }
