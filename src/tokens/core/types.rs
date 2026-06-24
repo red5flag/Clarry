@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::tokens::action::{TokenAction, EventBinding};
+use crate::tokens::action::{EventBinding, TokenAction};
 // Animation types imported when needed by consumers
 
 // ── Type aliases ─────────────────────────────────────────────────────────────
@@ -60,7 +60,10 @@ impl StyleToken {
         if let Some(bg) = self.bg {
             css.push_str(&format!(
                 "background: rgba({}, {}, {}, {});",
-                bg[0], bg[1], bg[2], bg[3] as f32 / 255.0
+                bg[0],
+                bg[1],
+                bg[2],
+                bg[3] as f32 / 255.0
             ));
         }
         if let Some(w) = self.w {
@@ -79,7 +82,10 @@ impl StyleToken {
             css.push_str(&format!("border-radius: {:.2}rem;", radius));
         }
         if let Some(shadow) = self.shadow {
-            css.push_str(&format!("box-shadow: 0 0 {:.2}rem rgba(0,0,0,0.3);", shadow));
+            css.push_str(&format!(
+                "box-shadow: 0 0 {:.2}rem rgba(0,0,0,0.3);",
+                shadow
+            ));
         }
         if let Some(pad) = self.pad {
             css.push_str(&format!("padding: {:.2}rem;", pad));
@@ -110,8 +116,13 @@ pub enum Layout {
     #[default]
     Col,
     Row,
-    Grid { cols: u8 },
-    Absolute { top: f32, left: f32 },
+    Grid {
+        cols: u8,
+    },
+    Absolute {
+        top: f32,
+        left: f32,
+    },
 }
 
 // ── Data binding ──────────────────────────────────────────────────────────────
@@ -305,5 +316,202 @@ pub trait IntoToken {
 }
 
 impl IntoToken for TokenNode {
-    fn into_node(self) -> TokenNode { self }
+    fn into_node(self) -> TokenNode {
+        self
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Str helper ────────────────────────────────────────────────────
+
+    #[test]
+    fn s_creates_arc_str() {
+        let val = s("hello");
+        assert_eq!(&*val, "hello");
+    }
+
+    // ── StyleToken ────────────────────────────────────────────────────
+
+    #[test]
+    fn default_style_compiles_empty() {
+        let style = StyleToken::default();
+        assert!(style.compile().is_empty());
+    }
+
+    #[test]
+    fn compile_background() {
+        let style = StyleToken {
+            bg: Some([255, 0, 0, 255]),
+            ..Default::default()
+        };
+        let css = style.compile();
+        assert!(css.contains("background: rgba(255, 0, 0, 1)"));
+    }
+
+    #[test]
+    fn compile_width_height() {
+        let style = StyleToken {
+            w: Some(10.0),
+            h: Some(5.5),
+            ..Default::default()
+        };
+        let css = style.compile();
+        assert!(css.contains("width: 10.00rem;"));
+        assert!(css.contains("height: 5.50rem;"));
+    }
+
+    #[test]
+    fn compile_positioning() {
+        let style = StyleToken {
+            top: Some(1.0),
+            left: Some(2.0),
+            ..Default::default()
+        };
+        let css = style.compile();
+        assert!(css.contains("top: 1.00rem;"));
+        assert!(css.contains("left: 2.00rem;"));
+    }
+
+    #[test]
+    fn compile_radius_shadow_pad_gap() {
+        let style = StyleToken {
+            radius: Some(0.5),
+            shadow: Some(1.0),
+            pad: Some(2.0),
+            gap: Some(0.25),
+            ..Default::default()
+        };
+        let css = style.compile();
+        assert!(css.contains("border-radius: 0.50rem;"));
+        assert!(css.contains("box-shadow:"));
+        assert!(css.contains("padding: 2.00rem;"));
+        assert!(css.contains("gap: 0.25rem;"));
+    }
+
+    #[test]
+    fn compile_extra_css_appended() {
+        let style = StyleToken {
+            extra: "display:flex;".into(),
+            ..Default::default()
+        };
+        let css = style.compile();
+        assert!(css.contains("display:flex;"));
+    }
+
+    #[test]
+    fn hash_key_deterministic() {
+        let style = StyleToken {
+            bg: Some([1, 2, 3, 4]),
+            w: Some(100.0),
+            ..Default::default()
+        };
+        assert_eq!(style.hash_key(), style.hash_key());
+    }
+
+    #[test]
+    fn hash_key_differs_for_different_styles() {
+        let a = StyleToken {
+            w: Some(10.0),
+            ..Default::default()
+        };
+        let b = StyleToken {
+            w: Some(20.0),
+            ..Default::default()
+        };
+        assert_ne!(a.hash_key(), b.hash_key());
+    }
+
+    // ── Layout ────────────────────────────────────────────────────────
+
+    #[test]
+    fn layout_default_is_col() {
+        assert_eq!(Layout::default(), Layout::Col);
+    }
+
+    // ── DataBinding ───────────────────────────────────────────────────
+
+    #[test]
+    fn one_way_binding() {
+        let b = DataBinding::one_way("user.name");
+        assert_eq!(&*b.key, "user.name");
+        assert!(b.target_id.is_none());
+        assert_eq!(b.mode, BindMode::OneWay);
+    }
+
+    #[test]
+    fn two_way_binding() {
+        let b = DataBinding::two_way("user.name", "name-input");
+        assert_eq!(&*b.key, "user.name");
+        assert_eq!(&*b.target_id.unwrap(), "name-input");
+        assert_eq!(b.mode, BindMode::TwoWay);
+    }
+
+    // ── TokenNode ─────────────────────────────────────────────────────
+
+    #[test]
+    fn token_node_new_defaults() {
+        let node = TokenNode::new("test-id");
+        assert_eq!(&*node.id, "test-id");
+        assert_eq!(&*node.tag, "div");
+        assert!(node.content.is_none());
+        assert!(node.children.is_empty());
+        assert!(!node.loading);
+        assert!(!node.disabled);
+    }
+
+    #[test]
+    fn clone_shallow_drops_children() {
+        let mut parent = TokenNode::new("parent");
+        parent.children.push(TokenNode::new("child"));
+        assert_eq!(parent.children.len(), 1);
+
+        let shallow = parent.clone_shallow();
+        assert_eq!(&*shallow.id, "parent");
+        assert!(shallow.children.is_empty());
+    }
+
+    #[test]
+    fn clone_shallow_preserves_fields() {
+        let mut node = TokenNode::new("n");
+        node.content = Some("hello".into());
+        node.variant = Some("primary".into());
+        node.loading = true;
+
+        let shallow = node.clone_shallow();
+        assert_eq!(&*shallow.content.unwrap(), "hello");
+        assert_eq!(&*shallow.variant.unwrap(), "primary");
+        assert!(shallow.loading);
+    }
+
+    #[test]
+    fn token_node_equality() {
+        let a = TokenNode::new("x");
+        let b = TokenNode::new("x");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn token_node_inequality_by_id() {
+        let a = TokenNode::new("x");
+        let b = TokenNode::new("y");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn into_token_identity() {
+        let node = TokenNode::new("t");
+        let id = node.id.clone();
+        let converted = node.into_node();
+        assert_eq!(converted.id, id);
+    }
+
+    // ── StyleMode ─────────────────────────────────────────────────────
+
+    #[test]
+    fn style_mode_default_is_inline() {
+        assert_eq!(StyleMode::default(), StyleMode::Inline);
+    }
 }

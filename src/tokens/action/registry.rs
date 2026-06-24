@@ -2,9 +2,9 @@
 //
 // Global action handler registry with concurrent access.
 
-use std::sync::Arc;
-use dashmap::DashMap;
 use crate::tokens::node::Str;
+use dashmap::DashMap;
+use std::sync::Arc;
 
 pub type ActionHandler = Arc<dyn Fn() + Send + Sync>;
 
@@ -13,12 +13,16 @@ pub struct ActionRegistry {
 }
 
 impl Default for ActionRegistry {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl ActionRegistry {
     pub fn new() -> Self {
-        Self { handlers: DashMap::new() }
+        Self {
+            handlers: DashMap::new(),
+        }
     }
 
     pub fn global() -> &'static Self {
@@ -46,5 +50,89 @@ impl ActionRegistry {
 
     pub fn get(&self, name: &str) -> Option<ActionHandler> {
         self.handlers.get(name).map(|h| Arc::clone(&*h))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[test]
+    fn registry_new_is_empty() {
+        let reg = ActionRegistry::new();
+        assert!(reg.get("anything").is_none());
+    }
+
+    #[test]
+    fn registry_default() {
+        let reg = ActionRegistry::default();
+        assert!(reg.get("anything").is_none());
+    }
+
+    #[test]
+    fn register_and_execute() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let c = counter.clone();
+        let reg = ActionRegistry::new();
+        reg.register("bump", move || {
+            c.fetch_add(1, Ordering::SeqCst);
+        });
+        reg.execute("bump");
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn execute_missing_does_not_panic() {
+        let reg = ActionRegistry::new();
+        reg.execute("missing");
+    }
+
+    #[test]
+    fn register_once_prevents_overwrite() {
+        let first = Arc::new(AtomicUsize::new(0));
+        let second = Arc::new(AtomicUsize::new(0));
+        let f = first.clone();
+        let s = second.clone();
+
+        let reg = ActionRegistry::new();
+        reg.register_once("action", move || {
+            f.fetch_add(1, Ordering::SeqCst);
+        });
+        reg.register_once("action", move || {
+            s.fetch_add(1, Ordering::SeqCst);
+        });
+
+        reg.execute("action");
+        assert_eq!(first.load(Ordering::SeqCst), 1);
+        assert_eq!(second.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn register_overwrites() {
+        let first = Arc::new(AtomicUsize::new(0));
+        let second = Arc::new(AtomicUsize::new(0));
+        let f = first.clone();
+        let s = second.clone();
+
+        let reg = ActionRegistry::new();
+        reg.register("action", move || {
+            f.fetch_add(1, Ordering::SeqCst);
+        });
+        reg.register("action", move || {
+            s.fetch_add(1, Ordering::SeqCst);
+        });
+
+        reg.execute("action");
+        assert_eq!(first.load(Ordering::SeqCst), 0);
+        assert_eq!(second.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn get_returns_handler() {
+        let reg = ActionRegistry::new();
+        reg.register("test", || {});
+        assert!(reg.get("test").is_some());
+        assert!(reg.get("other").is_none());
     }
 }
