@@ -72,7 +72,7 @@ fn main() {
 
 #[cfg(not(target_arch = "wasm32"))]
 async fn async_main() {
-    let addr = "0.0.0.0:3000".to_string();
+    let addr = std::env::var("CLARRY_BIND_ADDR").unwrap_or_else(|_| "127.0.0.1:3000".to_string());
     let pkg_path = "target/site/pkg".to_string();
     let pkg_path_clone = pkg_path.clone();
 
@@ -120,9 +120,20 @@ async fn async_main() {
 // This function returns a minimal HTML shell with no SSR content.
 // The WASM bundle will render everything client-side via mount_to_body.
 
+/// Escape a string for safe embedding inside a JavaScript double-quoted literal.
+fn escape_js_string(s: &str) -> String {
+    s.replace('\\', "\\\\")
+     .replace('"', "\\\"")
+     .replace('<', "\\x3c")
+     .replace('>', "\\x3e")
+     .replace('\n', "\\n")
+     .replace('\r', "\\r")
+}
+
 fn minimal_html_shell(_pkg_path: String, route: &str) -> String {
     let js_file = "/pkg/l8-loader.js".to_string();
     let keyframes = l8_loader::tokens::animation::keyframe_css();
+    let safe_route = escape_js_string(route);
 
     format!(
         r#"<!DOCTYPE html>
@@ -131,8 +142,8 @@ fn minimal_html_shell(_pkg_path: String, route: &str) -> String {
     <meta charset="UTF-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <title>L8 Token DSL</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js"></script>
+    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+    <script type="module" src="https://unpkg.com/@google/model-viewer/dist/model-viewer.min.js" crossorigin="anonymous"></script>
     <style id="tok-keyframes">{}</style>
     <script>
         window.__INITIAL_ROUTE__ = "{}";
@@ -150,7 +161,7 @@ fn minimal_html_shell(_pkg_path: String, route: &str) -> String {
 <body>
 </body>
 </html>"#,
-        keyframes, route, js_file
+        keyframes, safe_route, js_file
     )
 }
 

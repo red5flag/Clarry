@@ -1,8 +1,9 @@
 // API module stub for compilation
 use axum::{
-    extract::{Path, ws::{WebSocket, WebSocketUpgrade, Message}},
+    extract::{Path, Request, ws::{WebSocket, WebSocketUpgrade, Message}},
     http::StatusCode,
-    response::{IntoResponse, Json},
+    middleware::{self, Next},
+    response::{IntoResponse, Json, Response},
     routing::{get, post},
     Router,
 };
@@ -37,18 +38,35 @@ pub struct ExportRequest {
     pub tokens: Vec<String>,
 }
 
+/// Middleware that validates the `X-API-Key` header against `CLARRY_API_KEY`.
+async fn require_api_key(req: Request, next: Next) -> Response {
+    let expected = std::env::var("CLARRY_API_KEY").unwrap_or_default();
+    if expected.is_empty() {
+        return next.run(req).await;
+    }
+    match req.headers().get("x-api-key").and_then(|v| v.to_str().ok()) {
+        Some(key) if key == expected => next.run(req).await,
+        _ => StatusCode::UNAUTHORIZED.into_response(),
+    }
+}
+
 pub fn create_api_router() -> Router {
-    Router::new()
-        .route("/health", get(health_check))
+    let protected = Router::new()
         .route("/process", post(process_request))
         .route("/status/:id", get(get_status))
         .route("/export", post(export_bundle))
+        .layer(middleware::from_fn(require_api_key));
+
+    Router::new()
+        .route("/health", get(health_check))
+        .merge(protected)
 }
 
 pub fn create_log_router() -> Router {
     Router::new()
         .route("/ws/logs", get(ws_logs_handler))
         .route("/api/log", post(http_log_handler))
+        .layer(middleware::from_fn(require_api_key))
 }
 
 async fn ws_logs_handler(ws: WebSocketUpgrade) -> impl IntoResponse {
@@ -98,6 +116,9 @@ pub async fn health_check() -> Json<HealthResponse> {
 pub async fn process_request(
     Json(request): Json<ApiRequest>,
 ) -> Result<Json<ApiResponse>, StatusCode> {
+    if request.prompt.len() > 10_000 {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
     // Stub implementation
     Ok(Json(ApiResponse {
         success: true,
@@ -126,6 +147,13 @@ pub async fn get_status(
 pub async fn export_bundle(
     Json(request): Json<ExportRequest>,
 ) -> Result<Json<ApiResponse>, StatusCode> {
+    let allowed_formats = ["json", "yaml", "toml", "zip"];
+    if !allowed_formats.contains(&request.format.as_str()) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+    if request.tokens.len() > 1_000 {
+        return Err(StatusCode::PAYLOAD_TOO_LARGE);
+    }
     // Stub implementation
     Ok(Json(ApiResponse {
         success: true,
