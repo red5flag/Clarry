@@ -8,11 +8,11 @@
 //   Store::write("user.message.#", "hi") -> append to messages array
 //   Store::write("user.name", "Bob")     -> set a scalar
 
-use serde_json::Value;
-#[cfg(not(target_arch = "wasm32"))]
-use super::backends::MemoryStore;
 #[cfg(target_arch = "wasm32")]
 use super::backends::LocalStore;
+#[cfg(not(target_arch = "wasm32"))]
+use super::backends::MemoryStore;
+use serde_json::Value;
 
 pub struct Store;
 
@@ -60,10 +60,12 @@ impl Store {
 
     /// Delete the entire root key.
     pub fn delete_root(key: &str) {
-        #[cfg(target_arch = "wasm32")] {
+        #[cfg(target_arch = "wasm32")]
+        {
             LocalStore::delete(key);
         }
-        #[cfg(not(target_arch = "wasm32"))] {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
             MemoryStore::global().delete(key);
         }
     }
@@ -71,19 +73,23 @@ impl Store {
     // ── Backend helpers ──────────────────────────────────────────────────────────
 
     fn backend_get(key: &str) -> Option<String> {
-        #[cfg(target_arch = "wasm32")] {
+        #[cfg(target_arch = "wasm32")]
+        {
             LocalStore::get(key)
         }
-        #[cfg(not(target_arch = "wasm32"))] {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
             MemoryStore::global().get(key).map(|s| s.to_string())
         }
     }
 
     fn backend_set(key: &str, value: &str) {
-        #[cfg(target_arch = "wasm32")] {
+        #[cfg(target_arch = "wasm32")]
+        {
             LocalStore::set(key, value);
         }
-        #[cfg(not(target_arch = "wasm32"))] {
+        #[cfg(not(target_arch = "wasm32"))]
+        {
             MemoryStore::global().set(key, value);
         }
     }
@@ -170,4 +176,131 @@ fn write_path(val: &mut Value, segments: &[&str], value: &str) {
 fn json_str(s: &str) -> Value {
     // If it looks like JSON, parse it; otherwise store as string
     serde_json::from_str(s).unwrap_or_else(|_| Value::String(s.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn clean(key: &str) {
+        Store::delete_root(key);
+    }
+
+    #[test]
+    fn write_and_read_flat_key() {
+        clean("prim_flat");
+        Store::write("prim_flat", "hello");
+        assert_eq!(Store::read("prim_flat").unwrap(), "hello");
+    }
+
+    #[test]
+    fn read_missing_returns_none() {
+        assert!(Store::read("prim_nonexistent_xyz").is_none());
+    }
+
+    #[test]
+    fn write_and_read_nested_object() {
+        clean("prim_user");
+        Store::write("prim_user", r#"{"name":"Alice"}"#);
+        let name = Store::read("prim_user.name").unwrap();
+        assert_eq!(name, "Alice");
+    }
+
+    #[test]
+    fn write_nested_creates_structure() {
+        clean("prim_cfg");
+        Store::write("prim_cfg.theme", "dark");
+        let raw = Store::read("prim_cfg").unwrap();
+        let parsed: Value = serde_json::from_str(&raw).unwrap();
+        assert_eq!(parsed["theme"], "dark");
+    }
+
+    #[test]
+    fn write_nested_array_append() {
+        clean("prim_arr");
+        Store::write("prim_arr", r#"{"items":["a"]}"#);
+        Store::write("prim_arr.items.#", "b");
+        let raw = Store::read("prim_arr").unwrap();
+        let parsed: Value = serde_json::from_str(&raw).unwrap();
+        let items = parsed["items"].as_array().unwrap();
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[1], "b");
+    }
+
+    #[test]
+    fn write_nested_array_index() {
+        clean("prim_idx");
+        Store::write("prim_idx", r#"{"vals":["x","y","z"]}"#);
+        Store::write("prim_idx.vals.1", "replaced");
+        let val = Store::read("prim_idx.vals.1").unwrap();
+        assert_eq!(val, "replaced");
+    }
+
+    #[test]
+    fn write_json_typed() {
+        clean("prim_json");
+        Store::write_json("prim_json", &vec![1, 2, 3]);
+        let raw = Store::read("prim_json").unwrap();
+        let parsed: Vec<i32> = serde_json::from_str(&raw).unwrap();
+        assert_eq!(parsed, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn delete_root_removes_key() {
+        Store::write("prim_del", "x");
+        Store::delete_root("prim_del");
+        assert!(Store::read("prim_del").is_none());
+    }
+
+    #[test]
+    fn split_root_with_dot() {
+        let (root, rest) = split_root("a.b.c");
+        assert_eq!(root, "a");
+        assert_eq!(rest, "b.c");
+    }
+
+    #[test]
+    fn split_root_no_dot() {
+        let (root, rest) = split_root("simple");
+        assert_eq!(root, "simple");
+        assert_eq!(rest, "");
+    }
+
+    #[test]
+    fn navigate_object_field() {
+        let val: Value = serde_json::from_str(r#"{"x":42}"#).unwrap();
+        let result = navigate(&val, "x").unwrap();
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn navigate_array_index() {
+        let val: Value = serde_json::from_str(r#"[10,20,30]"#).unwrap();
+        let result = navigate(&val, "1").unwrap();
+        assert_eq!(result, 20);
+    }
+
+    #[test]
+    fn val_to_string_for_string() {
+        let val = Value::String("hello".into());
+        assert_eq!(val_to_string(&val), "hello");
+    }
+
+    #[test]
+    fn val_to_string_for_number() {
+        let val = Value::Number(42.into());
+        assert_eq!(val_to_string(&val), "42");
+    }
+
+    #[test]
+    fn json_str_parses_json() {
+        let val = json_str("42");
+        assert_eq!(val, Value::Number(42.into()));
+    }
+
+    #[test]
+    fn json_str_falls_back_to_string() {
+        let val = json_str("not json");
+        assert_eq!(val, Value::String("not json".into()));
+    }
 }

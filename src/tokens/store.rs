@@ -40,27 +40,38 @@ pub struct FlyCache {
 }
 
 impl Default for FlyCache {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl FlyCache {
-    pub fn new() -> Self { Self { map: DashMap::new() } }
+    pub fn new() -> Self {
+        Self {
+            map: DashMap::new(),
+        }
+    }
 
     /// Return the compiled CSS for `style`, compiling and caching on first access.
     /// Uses `DashMap::entry().or_insert_with()` to prevent double-compilation races.
     pub fn get_or_compile(&self, style: &StyleToken) -> Arc<str> {
         let key = style.hash_key();
-        let entry = self.map.entry(key).or_insert_with(|| {
-            style.compile().into()
-        });
+        let entry = self
+            .map
+            .entry(key)
+            .or_insert_with(|| style.compile().into());
         Arc::clone(&entry)
     }
 
     /// Number of unique styles in the cache.
-    pub fn len(&self) -> usize { self.map.len() }
+    pub fn len(&self) -> usize {
+        self.map.len()
+    }
 
     /// Whether the cache is empty.
-    pub fn is_empty(&self) -> bool { self.map.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
 }
 
 // ── TokenStore ────────────────────────────────────────────────────────────────
@@ -76,10 +87,15 @@ pub struct TokenStore {
 
 impl TokenStore {
     fn new() -> Self {
-        Self { nodes: DashMap::new(), cache: FlyCache::new() }
+        Self {
+            nodes: DashMap::new(),
+            cache: FlyCache::new(),
+        }
     }
 
-    pub fn global() -> &'static Self { &GLOBAL_STORE }
+    pub fn global() -> &'static Self {
+        &GLOBAL_STORE
+    }
 
     /// Register a tree: warm the cache for every node and index each one
     /// by id.  Only shallow clones are stored — no subtree is duplicated.
@@ -88,7 +104,8 @@ impl TokenStore {
     /// On WASM it runs sequentially (rayon is unavailable there).
     pub fn register(&self, root: &TokenNode) {
         self.cache.get_or_compile(&root.style);
-        self.nodes.insert(root.id.as_ref().into(), root.clone_shallow());
+        self.nodes
+            .insert(root.id.as_ref().into(), root.clone_shallow());
         Self::walk_children(&root.children);
     }
 
@@ -122,7 +139,9 @@ impl TokenStore {
         stack.push(root);
         while let Some(node) = stack.pop() {
             store.cache.get_or_compile(&node.style);
-            store.nodes.insert(node.id.as_ref().into(), node.clone_shallow());
+            store
+                .nodes
+                .insert(node.id.as_ref().into(), node.clone_shallow());
             for child in node.children.iter().rev() {
                 stack.push(child);
             }
@@ -141,10 +160,14 @@ impl TokenStore {
     }
 
     /// Total nodes indexed.
-    pub fn len(&self) -> usize { self.nodes.len() }
+    pub fn len(&self) -> usize {
+        self.nodes.len()
+    }
 
     /// Whether the store is empty.
-    pub fn is_empty(&self) -> bool { self.nodes.is_empty() }
+    pub fn is_empty(&self) -> bool {
+        self.nodes.is_empty()
+    }
 
     /// Update a stored node's content and re-register it.
     pub fn update_content(&self, id: &str, content: impl Into<crate::tokens::node::Str>) {
@@ -172,11 +195,15 @@ pub struct TokenArena {
 }
 
 impl Default for TokenArena {
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TokenArena {
-    pub fn new() -> Self { Self { bump: Bump::new() } }
+    pub fn new() -> Self {
+        Self { bump: Bump::new() }
+    }
 
     /// Intern a string slice — zero heap allocation.
     /// The returned &str is valid for the lifetime of the arena.
@@ -201,5 +228,145 @@ impl TokenArena {
     /// Bytes allocated so far (diagnostic / benchmarking).
     pub fn allocated_bytes(&self) -> usize {
         self.bump.allocated_bytes()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tokens::node::StyleToken;
+
+    // ── FlyCache ──────────────────────────────────────────────────────
+
+    #[test]
+    fn fly_cache_new_is_empty() {
+        let cache = FlyCache::new();
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+    }
+
+    #[test]
+    fn fly_cache_default() {
+        let cache = FlyCache::default();
+        assert!(cache.is_empty());
+    }
+
+    #[test]
+    fn fly_cache_compiles_and_caches() {
+        let cache = FlyCache::new();
+        let style = StyleToken {
+            w: Some(10.0),
+            ..Default::default()
+        };
+        let css1 = cache.get_or_compile(&style);
+        assert!(css1.contains("width: 10.00rem;"));
+        assert_eq!(cache.len(), 1);
+
+        let css2 = cache.get_or_compile(&style);
+        assert_eq!(css1, css2);
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn fly_cache_different_styles_different_entries() {
+        let cache = FlyCache::new();
+        let a = StyleToken {
+            w: Some(10.0),
+            ..Default::default()
+        };
+        let b = StyleToken {
+            h: Some(20.0),
+            ..Default::default()
+        };
+        cache.get_or_compile(&a);
+        cache.get_or_compile(&b);
+        assert_eq!(cache.len(), 2);
+    }
+
+    // ── TokenStore ────────────────────────────────────────────────────
+
+    #[test]
+    fn token_store_register_and_get() {
+        let store = TokenStore::global();
+        let node = TokenNode::new("store_test_1");
+        store.register(&node);
+        let retrieved = store.get("store_test_1");
+        assert!(retrieved.is_some());
+        assert_eq!(&*retrieved.unwrap().id, "store_test_1");
+    }
+
+    #[test]
+    fn token_store_get_missing_returns_none() {
+        let store = TokenStore::global();
+        assert!(store.get("nonexistent_node_xyz").is_none());
+    }
+
+    #[test]
+    fn token_store_register_tree_with_children() {
+        let store = TokenStore::global();
+        let mut parent = TokenNode::new("tree_parent");
+        parent.children.push(TokenNode::new("tree_child_a"));
+        parent.children.push(TokenNode::new("tree_child_b"));
+        store.register(&parent);
+        assert!(store.get("tree_parent").is_some());
+        assert!(store.get("tree_child_a").is_some());
+        assert!(store.get("tree_child_b").is_some());
+    }
+
+    #[test]
+    fn token_store_css_caches_style() {
+        let store = TokenStore::global();
+        let style = StyleToken {
+            pad: Some(1.0),
+            ..Default::default()
+        };
+        let css = store.css(&style);
+        assert!(css.contains("padding: 1.00rem;"));
+    }
+
+    #[test]
+    fn token_store_update_content() {
+        let store = TokenStore::global();
+        let node = TokenNode::new("update_test");
+        store.register(&node);
+        store.update_content("update_test", "new content");
+        let updated = store.get("update_test").unwrap();
+        assert_eq!(&*updated.content.unwrap(), "new content");
+    }
+
+    // ── TokenArena ────────────────────────────────────────────────────
+
+    #[test]
+    fn arena_intern() {
+        let arena = TokenArena::new();
+        let s = arena.intern("hello");
+        assert_eq!(s, "hello");
+    }
+
+    #[test]
+    fn arena_default() {
+        let arena = TokenArena::default();
+        assert_eq!(arena.allocated_bytes(), 0);
+    }
+
+    #[test]
+    fn arena_format() {
+        let arena = TokenArena::new();
+        let s = arena.format(format_args!("x = {}", 42));
+        assert_eq!(s, "x = 42");
+    }
+
+    #[test]
+    fn arena_own() {
+        let owned = TokenArena::own("test");
+        assert_eq!(&*owned, "test");
+    }
+
+    #[test]
+    fn arena_allocated_bytes_grows() {
+        let arena = TokenArena::new();
+        let before = arena.allocated_bytes();
+        arena.intern("some longer string data here");
+        assert!(arena.allocated_bytes() >= before);
     }
 }

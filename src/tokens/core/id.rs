@@ -26,3 +26,38 @@ pub fn next_id() -> Str {
 pub fn reset_id_counter() {
     ID_COUNTER.with(|n| n.set(0));
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn next_id_starts_at_zero() {
+        reset_id_counter();
+        assert_eq!(&*next_id(), "t0");
+    }
+
+    #[test]
+    fn next_id_increments() {
+        reset_id_counter();
+        let _ = next_id();
+        assert_eq!(&*next_id(), "t1");
+        assert_eq!(&*next_id(), "t2");
+    }
+
+    #[test]
+    fn reset_restarts_counter() {
+        reset_id_counter();
+        let _ = next_id();
+        let _ = next_id();
+        reset_id_counter();
+        assert_eq!(&*next_id(), "t0");
+    }
+
+    #[test]
+    fn id_format_matches_prefix() {
+        reset_id_counter();
+        let id = next_id();
+        assert!(id.starts_with('t'));
+    }
+}
