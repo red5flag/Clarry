@@ -19,7 +19,7 @@ pub struct DebugConfig {
 
 impl Default for DebugConfig {
     fn default() -> Self {
-        Self { enabled: true, verbose: false, show_styles: false, show_actions: true, validate_on_render: true }
+        Self { enabled: cfg!(debug_assertions), verbose: false, show_styles: false, show_actions: true, validate_on_render: true }
     }
 }
 

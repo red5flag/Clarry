@@ -506,22 +506,26 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
                         cb.forget();
                     }
                 }
-                // Track mouse to follow cursor
-                let js_code = "
-                    (function() {
-                        var t = document.getElementById('_tok_copy_toast');
-                        if (!t) return;
-                        var h = function(e) {
-                            t.style.left = e.clientX + 'px';
-                            t.style.top  = e.clientY + 'px';
-                        };
-                        document.addEventListener('mousemove', h, {passive: true});
-                        setTimeout(function() {
-                            document.removeEventListener('mousemove', h);
-                        }, 1600);
-                    })();
-                ";
-                let _ = js_sys::eval(js_code);
+                // Track mouse to follow cursor via DOM API (no eval)
+                if let Some(toast) = doc.get_element_by_id("_tok_copy_toast") {
+                    let toast_el: web_sys::HtmlElement = toast.unchecked_into();
+                    let toast_ref = toast_el.clone();
+                    let handler = wasm_bindgen::closure::Closure::<dyn FnMut(web_sys::MouseEvent)>::new(move |e: web_sys::MouseEvent| {
+                        let _ = toast_ref.style().set_property("left", &format!("{}px", e.client_x()));
+                        let _ = toast_ref.style().set_property("top", &format!("{}px", e.client_y()));
+                    });
+                    let _ = doc.add_event_listener_with_callback("mousemove", handler.as_ref().unchecked_ref());
+                    let doc2 = doc.clone();
+                    let handler_ref = handler.as_ref().unchecked_ref::<js_sys::Function>().clone();
+                    let cleanup = wasm_bindgen::closure::Closure::once(move || {
+                        let _ = doc2.remove_event_listener_with_callback("mousemove", &handler_ref);
+                    });
+                    let _ = win.set_timeout_with_callback_and_timeout_and_arguments_0(
+                        cleanup.as_ref().unchecked_ref(), 1600
+                    );
+                    handler.forget();
+                    cleanup.forget();
+                }
             }
         }
     } else if let Some(key) = name.strip_prefix("toggle:") {

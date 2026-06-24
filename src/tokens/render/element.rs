@@ -14,6 +14,15 @@ use crate::tokens::debug::inspector_log;
 use super::pipeline::NodeMeta;
 use super::executor::execute_token_action_reactive;
 
+/// Escape a value for safe embedding in an HTML attribute context.
+fn escape_html_attr(s: &str) -> String {
+    s.replace('&', "&amp;")
+     .replace('"', "&quot;")
+     .replace('\'', "&#x27;")
+     .replace('<', "&lt;")
+     .replace('>', "&gt;")
+}
+
 // ── Content interpolation ───────────────────────────────────────────────────────
 
 /// Interpolate template markers in a content string with reactive state.
@@ -680,7 +689,10 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
             "svg" => {
                 let raw_html = format!(
                     "<svg id=\"{}\" style=\"{}\" class=\"{}\">{}</svg>",
-                    meta.id, meta.style, meta.class.unwrap_or_default(), content_placeholder
+                    escape_html_attr(&meta.id),
+                    escape_html_attr(&meta.style),
+                    escape_html_attr(&meta.class.unwrap_or_default()),
+                    content_placeholder
                 );
                 view! { <div inner_html=raw_html /> }.into_any()
             }
@@ -702,19 +714,31 @@ pub(crate) fn build_div(meta: NodeMeta, children: Vec<AnyView>) -> AnyView {
                 view! { <summary id=id style=style_closure class=class_closure data-binding=meta.data_binding>{content_view}{children}</summary> }.into_any()
             }
             "script" => {
-                view! { <script>{content_placeholder}</script> }.into_any()
+                leptos::logging::warn!("[SECURITY] Blocked inline <script> tag rendering (id={})", meta.id);
+                view! { <div style="display:none" data-blocked-script="true" /> }.into_any()
             }
             "picture" | "source" => {
                 let raw_tag = meta.tag.clone();
                 let mut attrs = String::new();
+                let allowed_attrs = ["srcset", "sizes", "media", "type", "src", "width", "height"];
                 for (k, v) in &meta.attributes {
+                    if !allowed_attrs.contains(&&**k) {
+                        continue;
+                    }
                     if v.is_empty() {
-                        attrs.push_str(&format!(" {}", k));
+                        attrs.push_str(&format!(" {}", escape_html_attr(k)));
                     } else {
-                        attrs.push_str(&format!(" {}=\"{}\"", k, v));
+                        attrs.push_str(&format!(" {}=\"{}\"", escape_html_attr(k), escape_html_attr(v)));
                     }
                 }
-                let raw_html = format!("<{} id=\"{}\" style=\"{}\" class=\"{}\" {} />", raw_tag, meta.id, meta.style, meta.class.unwrap_or_default(), attrs);
+                let raw_html = format!(
+                    "<{} id=\"{}\" style=\"{}\" class=\"{}\" {} />",
+                    escape_html_attr(&raw_tag),
+                    escape_html_attr(&meta.id),
+                    escape_html_attr(&meta.style),
+                    escape_html_attr(&meta.class.unwrap_or_default()),
+                    attrs
+                );
                 view! { <div inner_html=raw_html /> }.into_any()
             }
             _ => {
