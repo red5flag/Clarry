@@ -1,6 +1,4 @@
-use crate::data::app_data::seed_instagram_storage;
-use crate::tokens::storage::primitive::Store;
-if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+crate::data::app_data::ensure_ig_seeded();
 
 col
         id instagram_notifications_page
@@ -172,29 +170,4 @@ col
                 css border border-gray-600 text-xs font-medium px-3 py-1.5
                 act tog ig/following/frank
 
-        row
-            css fixed bottom-0 left-0 right-0 bg-gray-900 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto lg:max-w-6xl lg:hidden
-            btn "🏠"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_home
-            btn "🔍"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_explore
-            btn "➕"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_create
-            btn "🎬"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_profile
-            btn "♡"
-                var ghost
-                css text-2xl
-                act nav instagram_notifications
-            btn "👤"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram
+        ig_bottom_nav("notifications")

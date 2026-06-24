@@ -1134,3 +1134,12 @@ pub fn register_app_schemas() {
         format: StorageFormat::Json,
     });
 }
+
+/// Ensure Instagram seed data is loaded into the token store.
+/// Idempotent — only seeds on the first call per session.
+pub fn ensure_ig_seeded() {
+    use crate::tokens::storage::primitive::Store;
+    if Store::read("ig.me.name").is_none() {
+        seed_instagram_storage();
+    }
+}
