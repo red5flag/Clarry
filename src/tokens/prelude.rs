@@ -39,6 +39,8 @@ pub use crate::tokens::{
     terminal, log_view, hex_view, tree_view, shortcut,
     tab, section,
     stack, inf, instagram_sidebar,
+    ig_bottom_nav, ig_post_thumb, ig_reel_card, ig_story_circle, ig_story_circle_nav,
+    ig_suggest_card, ig_action_row, ig_feed_post,
     video, video_ambient, audio_player, audio, model_viewer, model, iframe,
     chat_bubble, chat_ui, qr_code,
     progress_bar, rating,

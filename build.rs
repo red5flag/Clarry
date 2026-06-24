@@ -52,6 +52,9 @@ fn preprocess_token_dsl(content: &str) -> String {
         "pill_chip(",
         "write_to(", "read_from(", "add_to(", "remove_from(", "clear_key(",
         "load_from(", "storage_panel(", "list_panel(", "file_storage_panel(",
+        "ig_bottom_nav(", "ig_post_thumb(", "ig_reel_card(",
+        "ig_story_circle(", "ig_story_circle_nav(",
+        "ig_suggest_card(", "ig_action_row(", "ig_feed_post(",
     ];
 
     let is_real_container   = |s: &str| real_containers.iter().any(|n| s.starts_with(n));
