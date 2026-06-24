@@ -1,6 +1,4 @@
-use crate::data::app_data::seed_instagram_storage;
-use crate::tokens::storage::primitive::Store;
-if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+crate::data::app_data::ensure_ig_seeded();
 
 col
         id instagram_page
@@ -85,38 +83,10 @@ col
 
         row
             css px-4 lg:px-6 py-3 gap-4 lg:gap-6 overflow-x-auto scrollbar-none border-b border-gray-800
-            col
-                css items-center gap-1 min-w-[64px]
-                block
-                    css w-14 h-14 lg:w-16 lg:h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600
-                    img_block "https://picsum.photos/60/60?random=10"
-                        css w-full h-full rounded-full border-2 border-black object-cover
-                txt "DSL"
-                    css text-xs text-gray-300
-            col
-                css items-center gap-1 min-w-[64px]
-                block
-                    css w-14 h-14 lg:w-16 lg:h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600
-                    img_block "https://picsum.photos/60/60?random=13"
-                        css w-full h-full rounded-full border-2 border-black object-cover
-                txt "Work"
-                    css text-xs text-gray-300
-            col
-                css items-center gap-1 min-w-[64px]
-                block
-                    css w-14 h-14 lg:w-16 lg:h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600
-                    img_block "https://picsum.photos/60/60?random=14"
-                        css w-full h-full rounded-full border-2 border-black object-cover
-                txt "Travel"
-                    css text-xs text-gray-300
-            col
-                css items-center gap-1 min-w-[64px]
-                block
-                    css w-14 h-14 lg:w-16 lg:h-16 rounded-full p-0.5 bg-gradient-to-tr from-yellow-400 via-pink-500 to-purple-600
-                    img_block "https://picsum.photos/60/60?random=12"
-                        css w-full h-full rounded-full border-2 border-black object-cover
-                txt "Setup"
-                    css text-xs text-gray-300
+            ig_story_circle("https://picsum.photos/60/60?random=10", "DSL")
+            ig_story_circle("https://picsum.photos/60/60?random=13", "Work")
+            ig_story_circle("https://picsum.photos/60/60?random=14", "Travel")
+            ig_story_circle("https://picsum.photos/60/60?random=12", "Setup")
 
         row
             css border-b border-gray-800
@@ -143,36 +113,11 @@ col
             id ig_own_posts_panel
             grid 3
                 css grid-cols-3 gap-1 lg:gap-2
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_1
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=10"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_2
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=11"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_3
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=12"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_4
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=13"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_5
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=14"
-                        css w-full h-full object-cover block
+                ig_post_thumb("p_alice_1", "https://picsum.photos/600/600?random=10")
+                ig_post_thumb("p_alice_2", "https://picsum.photos/600/600?random=11")
+                ig_post_thumb("p_alice_3", "https://picsum.photos/600/600?random=12")
+                ig_post_thumb("p_alice_4", "https://picsum.photos/600/600?random=13")
+                ig_post_thumb("p_alice_5", "https://picsum.photos/600/600?random=14")
                 block
                     css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
                     act store_set ig/viewing/post_id, p_alice_reel_1
@@ -187,67 +132,19 @@ col
             css hidden
             grid 3
                 css grid-cols-3 gap-1 lg:gap-2
-                block
-                    css h-[320px] lg:h-[520px] bg-black relative overflow-hidden cursor-pointer
-                    act store_set ig/viewing/post_id, p_alice_reel_1
-                    act nav instagram_post
-                    img_block "https://picsum.photos/400/700?random=15"
-                        css absolute inset-0 w-full h-full object-cover
-                    block
-                        css absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black to-transparent pointer-events-none
-                    row
-                        css absolute bottom-2 left-2 right-2 items-end justify-between
-                        col
-                            css gap-0.5
-                            txt "Live coding a full Instagram UI"
-                                css text-xs lg:text-sm font-semibold text-white
-                            txt "42K views"
-                                css text-xs text-white
-                        btn "▶"
-                            var ghost
-                            css text-lg lg:text-xl text-white
+                ig_reel_card("https://picsum.photos/400/700?random=15", "Live coding a full Instagram UI", "42K views")
 
         block
             id ig_own_tagged_panel
             css hidden
             grid 3
                 css grid-cols-3 gap-1 lg:gap-2
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_grace_1
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=20"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_grace_3
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=21"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_eve_1
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=22"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_eve_4
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=23"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_henry_1
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=24"
-                        css w-full h-full object-cover block
-                block
-                    css aspect-square bg-gray-900 overflow-hidden relative cursor-pointer
-                    act store_set ig/viewing/post_id, p_henry_4
-                    act nav instagram_post
-                    img_block "https://picsum.photos/600/600?random=25"
-                        css w-full h-full object-cover block
+                ig_post_thumb("p_grace_1", "https://picsum.photos/600/600?random=20")
+                ig_post_thumb("p_grace_3", "https://picsum.photos/600/600?random=21")
+                ig_post_thumb("p_eve_1", "https://picsum.photos/600/600?random=22")
+                ig_post_thumb("p_eve_4", "https://picsum.photos/600/600?random=23")
+                ig_post_thumb("p_henry_1", "https://picsum.photos/600/600?random=24")
+                ig_post_thumb("p_henry_4", "https://picsum.photos/600/600?random=25")
 
 
         block
@@ -318,29 +215,4 @@ col
                         css flex-1 rounded-xl py-2.5 text-sm font-semibold border border-gray-700
                         act hide ig_edit_modal
 
-        row
-            css fixed bottom-0 left-0 right-0 bg-gray-900 backdrop-blur border-t border-gray-800 py-2 px-4 justify-around items-center z-50 max-w-lg mx-auto lg:max-w-6xl lg:hidden
-            btn "🏠"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_home
-            btn "🔍"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_explore
-            btn "➕"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_create
-            btn "🎬"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_profile
-            btn "♡"
-                var ghost
-                css text-2xl opacity-60
-                act nav instagram_notifications
-            btn "👤"
-                var ghost
-                css text-2xl
-                act nav instagram
+        ig_bottom_nav("profile")

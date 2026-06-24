@@ -1,6 +1,4 @@
-use crate::data::app_data::seed_instagram_storage;
-use crate::tokens::storage::primitive::Store;
-if Store::read("ig.me.name").is_none() { seed_instagram_storage(); }
+crate::data::app_data::ensure_ig_seeded();
 
 col
         id instagram_story_page
