@@ -9,7 +9,7 @@ use wasm_bindgen::JsCast;
 
 pub fn show_element(_show: &str, _hide: &[&str]) {
     #[cfg(target_arch = "wasm32")] {
-        let doc = web_sys::window().unwrap().document().unwrap();
+        let Some(doc) = web_sys::window().and_then(|w| w.document()) else { return };
         for id in _hide {
             if let Some(el) = doc.get_element_by_id(id) {
                 let _ = el.unchecked_into::<web_sys::HtmlElement>()

@@ -396,7 +396,8 @@ impl FilterBuilder {
         F: Fn(Str) -> TokenNode + Send + Sync + 'static,
     {
         let predicate = if self.predicates.len() == 1 {
-            self.predicates.into_iter().next().unwrap()
+            self.predicates.into_iter().next()
+                .expect("FilterBuilder::render: predicates confirmed len()==1 but next() was None")
         } else {
             FilterPredicate::And(self.predicates)
         };
@@ -475,7 +476,8 @@ impl FindBuilder {
         F: Fn(Str) -> TokenNode + Send + Sync + 'static,
     {
         let predicate = if self.predicates.len() == 1 {
-            self.predicates.into_iter().next().unwrap()
+            self.predicates.into_iter().next()
+                .expect("FindBuilder::render: predicates confirmed len()==1 but next() was None")
         } else {
             FilterPredicate::And(self.predicates)
         };

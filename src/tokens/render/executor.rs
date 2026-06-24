@@ -97,7 +97,9 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                 leptos::logging::log!("[TOKEN_ACTION] Navigate - page: {}", page);
                 #[cfg(target_arch = "wasm32")]
                 if let Some(window) = web_sys::window() {
-                    let _ = window.location().set_href(&format!("/{}", page));
+                    if let Err(e) = window.location().set_href(&format!("/{}", page)) {
+                        leptos::logging::warn!("Navigate to '{}' failed: {:?}", page, e);
+                    }
                 }
             }
             TokenAction::ScrollTo { target, behavior } => {
@@ -239,7 +241,9 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                 if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
                     if let Some(el) = doc.document_element() {
                         if let Ok(elem) = el.dyn_into::<web_sys::HtmlElement>() {
-                            let _ = elem.request_fullscreen();
+                            if let Err(e) = elem.request_fullscreen() {
+                                leptos::logging::warn!("request_fullscreen failed: {:?}", e);
+                            }
                         }
                     }
                 }
@@ -247,7 +251,7 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             TokenAction::ExitFullscreen => {
                 #[cfg(target_arch = "wasm32")]
                 if let Some(doc) = web_sys::window().and_then(|w| w.document()) {
-                    let _ = doc.exit_fullscreen();
+                    doc.exit_fullscreen();
                 }
             }
             TokenAction::RequestPointerLock => {
@@ -272,7 +276,9 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
             TokenAction::Notify { title, body: _, icon: _ } => {
                 #[cfg(target_arch = "wasm32")]
                 {
-                    let _ = web_sys::Notification::new(title.as_ref());
+                    if let Err(e) = web_sys::Notification::new(title.as_ref()) {
+                        leptos::logging::warn!("Notification creation failed: {:?}", e);
+                    }
                 }
             }
             TokenAction::Share { title, text, url } => {
@@ -298,14 +304,18 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                     leptos::logging::log!("[TOKEN_ACTION] OpenUrl - url: {}, new_tab: true", url);
                     #[cfg(target_arch = "wasm32")] {
                         if let Some(win) = web_sys::window() {
-                            let _ = win.open_with_url_and_target(url, "_blank");
+                            if let Err(e) = win.open_with_url_and_target(url, "_blank") {
+                                leptos::logging::warn!("open_with_url_and_target failed for '{}': {:?}", url, e);
+                            }
                         }
                     }
                 } else {
                     leptos::logging::log!("[TOKEN_ACTION] OpenUrl - url: {}, new_tab: false", url);
                     #[cfg(target_arch = "wasm32")] {
                         if let Some(win) = web_sys::window() {
-                            let _ = win.location().set_href(url);
+                            if let Err(e) = win.location().set_href(url) {
+                                leptos::logging::warn!("Navigate to URL '{}' failed: {:?}", url, e);
+                            }
                         }
                     }
                 }
@@ -316,7 +326,7 @@ pub(crate) fn execute_token_action_reactive(actions: &[TokenAction], ctx: TokenC
                     if let Some(win) = web_sys::window() {
                         if let Ok(nav) = win.navigator().dyn_into::<web_sys::Navigator>() {
                             let clipboard = nav.clipboard();
-                            let _ = clipboard.write_text(text);
+                            clipboard.write_text(text);
                         }
                     }
                 }
@@ -446,19 +456,25 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
         leptos::logging::log!("[TOKEN_ACTION] route -> navigating to {}", path);
         #[cfg(target_arch = "wasm32")]
         if let Some(win) = web_sys::window() {
-            let _ = win.location().set_href(path);
+            if let Err(e) = win.location().set_href(path) {
+                leptos::logging::warn!("route navigation to '{}' failed: {:?}", path, e);
+            }
         }
     } else if let Some(url) = name.strip_prefix("open_url:") {
         leptos::logging::log!("[TOKEN_ACTION] open_url -> {}", url);
         #[cfg(target_arch = "wasm32")]
         if let Some(win) = web_sys::window() {
-            let _ = win.location().set_href(url);
+            if let Err(e) = win.location().set_href(url) {
+                leptos::logging::warn!("open_url navigation to '{}' failed: {:?}", url, e);
+            }
         }
     } else if let Some(url) = name.strip_prefix("open_url_new:") {
         leptos::logging::log!("[TOKEN_ACTION] open_url_new -> {}", url);
         #[cfg(target_arch = "wasm32")]
         if let Some(win) = web_sys::window() {
-            let _ = win.open_with_url_and_target(url, "_blank");
+            if let Err(e) = win.open_with_url_and_target(url, "_blank") {
+                leptos::logging::warn!("open_url_new to '{}' failed: {:?}", url, e);
+            }
         }
     } else if let Some(text) = name.strip_prefix("copy:") {
         leptos::logging::log!("[TOKEN_ACTION] copy -> {}", text);
@@ -466,7 +482,7 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
         if let Some(win) = web_sys::window() {
             if let Ok(nav) = win.navigator().dyn_into::<web_sys::Navigator>() {
                 let clipboard = nav.clipboard();
-                let _ = clipboard.write_text(text);
+                clipboard.write_text(text);
             }
         }
     } else if let Some(encoded) = name.strip_prefix("copy_with_toast:") {
@@ -476,7 +492,7 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
         if let Some(win) = web_sys::window() {
             // Copy to clipboard
             if let Ok(nav) = win.navigator().dyn_into::<web_sys::Navigator>() {
-                let _ = nav.clipboard().write_text(&text);
+                nav.clipboard().write_text(&text);
             }
             // Spawn cursor-following "Copied!" toast via eval
             if let Some(doc) = win.document() {
@@ -521,7 +537,9 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
                         }, 1600);
                     })();
                 ";
-                let _ = js_sys::eval(js_code);
+                if let Err(e) = js_sys::eval(js_code) {
+                    leptos::logging::warn!("Toast mousemove eval failed: {:?}", e);
+                }
             }
         }
     } else if let Some(key) = name.strip_prefix("toggle:") {
@@ -790,7 +808,9 @@ fn execute_custom_action(name: &str, ctx: TokenCtx) {
             let closure = wasm_bindgen::closure::Closure::wrap(Box::new(move |_e: web_sys::Event| {
                 ActionRegistry::global().execute(&format!("scroll:{}", handler));
             }) as Box<dyn FnMut(_)>);
-            let _ = win.add_event_listener_with_callback("scroll", closure.as_ref().unchecked_ref());
+            if let Err(e) = win.add_event_listener_with_callback("scroll", closure.as_ref().unchecked_ref()) {
+                leptos::logging::warn!("Failed to add scroll listener: {:?}", e);
+            }
             closure.forget();
         }
     } else if let Some(endpoint) = name.strip_prefix("inf:") {

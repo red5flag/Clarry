@@ -58,7 +58,8 @@ impl Container {
     /// Pop the current builder context, moving the finished child into its parent.
     pub fn end(mut self) -> Self {
         if self.stack.len() > 1 {
-            let child = self.stack.pop().unwrap();
+            let child = self.stack.pop()
+                .expect("Container::end: stack underflow — more end() calls than nested containers");
             // If the finished container has a data-name, register it for reference.
             if let Some(name) = child.attributes.get("data-name").map(|s| s.to_string()) {
                 register_named(&name, &child);
@@ -528,19 +529,22 @@ impl Container {
 
 impl TokenBuilder for Container {
     fn node_mut(&mut self) -> &mut TokenNode {
-        self.stack.last_mut().unwrap()
+        self.stack.last_mut()
+            .expect("Container::node_mut: stack is empty — Container was consumed or never initialized")
     }
 }
 
 impl IntoToken for Container {
     fn into_node(mut self) -> TokenNode {
         while self.stack.len() > 1 {
-            let child = self.stack.pop().unwrap();
+            let child = self.stack.pop()
+                .expect("Container::into_node: stack underflow during collapse");
             if let Some(parent) = self.stack.last_mut() {
                 parent.children.push(child);
             }
         }
-        self.stack.into_iter().next().unwrap()
+        self.stack.into_iter().next()
+            .expect("Container::into_node: stack was empty — no root node")
     }
 }
 

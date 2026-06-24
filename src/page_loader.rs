@@ -58,8 +58,14 @@ fn get_registry() -> &'static Mutex<PageRegistry> {
 }
 
 /// Convenience accessor — locks the global registry for read/write.
+/// Recovers from a poisoned mutex by taking the inner value, since a
+/// panic during page registration should not permanently break the registry.
 fn with_registry<T>(f: impl FnOnce(&mut PageRegistry) -> T) -> T {
-    f(get_registry().lock().unwrap().deref_mut())
+    let mut guard = get_registry().lock().unwrap_or_else(|poisoned| {
+        leptos::logging::error!("Page registry mutex was poisoned; recovering");
+        poisoned.into_inner()
+    });
+    f(guard.deref_mut())
 }
 
 /// Register a page globally. Call from page modules at load time.

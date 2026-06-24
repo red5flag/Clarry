@@ -49,10 +49,16 @@ async fn serve_wasm(Path(path): Path<String>, pkg_path: String) -> impl IntoResp
                     }
                     response
                 }
-                Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+                Err(e) => {
+                    eprintln!("Failed to read file {}: {}", full_path.display(), e);
+                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
             }
         }
-        Err(_) => StatusCode::NOT_FOUND.into_response(),
+        Err(e) => {
+            eprintln!("File not found {}: {}", full_path.display(), e);
+            StatusCode::NOT_FOUND.into_response()
+        }
     }
 }
 
@@ -110,9 +116,13 @@ async fn async_main() {
     println!("📦 pkg path: {}", pkg_path);
     println!("🌐 CSR: Ready to serve requests (pure client-side rendering)");
 
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await
+        .unwrap_or_else(|e| panic!("Failed to bind to {}: {}. Is the port already in use?", addr, e));
     println!("🌐 CSR: Successfully bound to address {}", addr);
-    axum::serve(listener, app).await.unwrap();
+    if let Err(e) = axum::serve(listener, app).await {
+        eprintln!("Server error: {}", e);
+        std::process::exit(1);
+    }
 }
 
 // ── Minimal HTML shell for pure CSR ──────────────────────────────────────────────
